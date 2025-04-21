@@ -1,7 +1,6 @@
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from bson import ObjectId
-from typing import Optional
-
+from uuid import uuid4, UUID
+from datetime import datetime,timezone
 class UserBase(BaseModel):
     
     email: EmailStr = Field(..., description="User email")
@@ -18,16 +17,14 @@ class UserCreate(UserBase):
        
     
 class UserInDB(UserBase):
-    id: int = Field(...,alias='_id' ,description="User ID")
+    id: int = UUID(default_factory=uuid4, description="User ID")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="User creation date")
     hashed_password: str
     
-    class Config:
-        arbitray_types_allowed = True
-        json_encoders = {ObjectId: str}
 
 class UserResponse(UserBase):
     id: int 
 
 class UserLogin(BaseModel):
     email: EmailStr = Field(..., description="User email")
-    password: str = Field(..., description="User password", min_length=6, max_length=100)
+    password: str = Field(..., description="User password", min_length=6)
