@@ -65,6 +65,30 @@ def decode_token(token:str)->TokenData:
             headers={"WWW-Authenticate":"Bearer"}
         )
 
+def decode_refresh_token(token: str) -> str:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        token_type: str = payload.get("type")
+        if email is None or token_type != "refresh":  # Ensure it's a refresh token
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid Refresh Token",
+                headers={"WWW-Authenticate": "Bearer"}
+            )
+        return email  # Only return email (or return the TokenData if needed)
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh Token has expired",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+    except jwt.PyJWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Refresh Token",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
 
 
 # Password hashing
