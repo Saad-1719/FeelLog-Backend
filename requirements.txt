@@ -2,7 +2,6 @@ fastapi
 uvicorn
 pydantic
 bson
-uuid
 passlib
 bcrypt
 python-dotenv
