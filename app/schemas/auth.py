@@ -8,8 +8,8 @@ class UserBase(BaseModel):
     full_name: str = Field(..., description="User full name", min_length=3, max_length=100)
 
 class UserCreate(UserBase):
-    password: str = Field(..., description="User password", min_length=8, max_length=100)
-    confirm_password: str = Field(..., description="Confirm password", min_length=8, max_length=100)
+    password: str = Field(..., description="User password", min_length=6, max_length=100)
+    confirm_password: str = Field(..., description="Confirm password", min_length=6, max_length=100)
     
     @field_validator("confirm_password")
     def check_password(cls, confirm_password: str, info: ValidationInfo) -> str:
@@ -28,14 +28,15 @@ class UserInDB(UserBase):
         from_attributes = True  # Enable ORM mode
 
 class UserPublic(UserBase):
-    created_at: datetime
-    
+    created_at:datetime
+    profile_photo: str  # Add profile photo field
+    full_name: str      
     class Config:
         from_attributes = True
 
 class UserLogin(BaseModel):
     email: EmailStr = Field(..., description="User email")
-    password: str = Field(..., description="User password", min_length=8)
+    password: str = Field(..., description="User password", min_length=6)
 
 class Token(BaseModel):
     access_token: str
