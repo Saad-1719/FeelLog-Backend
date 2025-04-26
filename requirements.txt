@@ -12,6 +12,6 @@ pydantic_settings
 jose
 alembic
 pydantic[email]
-bycrypt
+bycrypt==4.3.0
 pyjwt
 alembic
