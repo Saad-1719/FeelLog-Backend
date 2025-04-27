@@ -14,4 +14,5 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     profile_photo=Column(String,nullable=True) #new column added
-     
+    refresh_token=Column(String,nullable=True)
+    refresh_token_expires_at = Column(DateTime, nullable=True)  # Optional: store expiry

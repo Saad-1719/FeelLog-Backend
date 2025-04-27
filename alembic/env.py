@@ -1,7 +1,6 @@
 from logging.config import fileConfig
 from dotenv import load_dotenv
-from sqlalchemy import engine_from_config,create_engine,pool
-from sqlalchemy import pool
+from sqlalchemy import engine_from_config,pool
 from alembic import context
 import os
 load_dotenv()
@@ -53,7 +52,7 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
     def include_object(object, name, type_, reflected, compare_to):
-        if type_ == "table" and not compare_to:
+        if type_ == "table" and compare_to is None:
             return False  # Don't drop tables that aren't in metadata
         return True
 
