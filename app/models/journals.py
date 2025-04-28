@@ -1,8 +1,7 @@
 from pydantic import BaseModel, Field
 from bson import ObjectId
-from sqlalchemy.dialects.postgresql import UUID
 
-from typing import Optional, List, Dict, Any
+from typing import Optional
 
 from datetime import datetime
 

@@ -36,6 +36,3 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     user_id: Optional[UUID] = None
     type: Optional[str] = None
-
-class TokenRefreshRequest(BaseModel):
-    refresh_token: str = Field(..., description="Refresh token")

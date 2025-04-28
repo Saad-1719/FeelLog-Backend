@@ -1,18 +1,15 @@
 from fastapi import APIRouter,Response,Request
-from app.models import user as user_model
-from app.core.security import verify_password,hash_password,create_refresh_token,create_access_token,decode_refresh_token
+from app.schemas import user_schema as user_model
+from app.utils.password import verify_password,hash_password
+from app.utils.tokens import create_refresh_token,create_access_token,decode_refresh_token
 from fastapi import Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from app.schemas.auth import UserCreate,UserLogin,Token,UserPublic
-from app.dependencies.database import get_session
+from app.models.auth import UserCreate,UserLogin,Token,UserPublic
+from app.services.db import get_session
 from app.dependencies.auth import get_current_user
 import random
 from datetime import timezone,timedelta,datetime
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
-REFRESH_TOKEN_EXPIRE_MINUTES = int(eval(os.getenv("REFRESH_TOKEN_EXPIRE_MINUTES")))
+from app.core.config import REFRESH_TOKEN_EXPIRE_MINUTES
 
 router=APIRouter()
 profileImg=["https://i.imghippo.com/files/RlV6585mKA.png","https://i.imghippo.com/files/fxla8778FLI.png","https://i.imghippo.com/files/mFFj4453sw.png"]
