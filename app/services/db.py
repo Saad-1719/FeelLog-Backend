@@ -19,3 +19,10 @@ try:
         print("Database connection successful.")
 except Exception as e:
     print(f"Database connection failed: {e}")
+
+def get_session():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from app.api.routes import auth_routes
 from fastapi.middleware.cors import CORSMiddleware
-from app.services.db import engine,Base
-from app.models import user as user_model
+from app.services.db import engine
+from app.schemas import user_schema as user_model
 from contextlib import asynccontextmanager
 
 @asynccontextmanager
