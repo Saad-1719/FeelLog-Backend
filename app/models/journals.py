@@ -22,7 +22,7 @@ class JournalInDB(JournalBase):
     class Config:
         arbitrary_types_allowed = True
         json_encoders = {ObjectId: str}
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "title": "My First Journal",
                 "content": "This is the content of my first journal.",
