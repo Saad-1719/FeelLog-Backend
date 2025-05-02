@@ -1,11 +1,8 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm import declarative_base
-from dotenv import load_dotenv
-import os
+from app.core.config import DATABASE_URL
 
-load_dotenv()
-DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable not set.")
 
@@ -19,3 +16,10 @@ try:
         print("Database connection successful.")
 except Exception as e:
     print(f"Database connection failed: {e}")
+
+def get_session():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

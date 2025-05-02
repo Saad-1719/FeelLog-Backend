@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, field_validator, ValidationInfo
+from pydantic import BaseModel, EmailStr, Field, field_validator, ValidationInfo,ConfigDict
 from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID, uuid4
@@ -22,8 +22,7 @@ class UserPublic(UserBase):
     id: UUID
     created_at:datetime
     profile_photo: str  # Add profile photo field
-    class Config:
-        from_attributes = True
+    model_config=ConfigDict(from_attributes=True)
 
 class UserLogin(BaseModel):
     email: EmailStr = Field(..., description="User email")
@@ -36,6 +35,7 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     user_id: Optional[UUID] = None
     type: Optional[str] = None
-
-class TokenRefreshRequest(BaseModel):
-    refresh_token: str = Field(..., description="Refresh token")
+    
+class UserId(BaseModel):
+    id:UUID
+    model_config=ConfigDict(from_attributes=True)

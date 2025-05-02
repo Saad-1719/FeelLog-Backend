@@ -1,34 +1,17 @@
-from pydantic import BaseModel, Field
-from bson import ObjectId
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Float
+from sqlalchemy.orm import relationship
+from app.services.db import Base
 from sqlalchemy.dialects.postgresql import UUID
+import uuid
 
-from typing import Optional, List, Dict, Any
-
-from datetime import datetime
-
-class JournalBase(BaseModel):
-    title: str = Field(..., description="Journal title", min_length=1)
-    content: str = Field(..., description="Journal content", min_length=1)
-    created_at: Optional[datetime] = Field(None, description="Journal creation date")
-    updated_at: Optional[datetime] = Field(None, description="Journal update date")
-
-
-class JournalCreate(JournalBase):
-    pass
-
-class JournalInDB(JournalBase):
-    id: int = Field(..., description="Journal ID")
-    user_id: str = Field(..., description="User ID of the journal owner")
-
-    class Config:
-        arbitrary_types_allowed = True
-        json_encoders = {ObjectId: str}
-        schema_extra = {
-            "example": {
-                "title": "My First Journal",
-                "content": "This is the content of my first journal.",
-                "created_at": "2023-10-01T12:00:00Z",
-                "updated_at": "2023-10-01T12:00:00Z",
-                "user_id": "603d2f4f1c4ae5b8d8e4a0b0"
-            }
-        }
+class Journal(Base):
+    __tablename__ = "journals"
+    id = Column(UUID(as_uuid=True), primary_key=True, index=True, default=uuid.uuid4)
+    title = Column(String, nullable=False)
+    content = Column(String, nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    sentiment_label = Column(String, nullable=False)
+    sentiment_score = Column(Float, nullable=False)
+    created_at = Column(DateTime, nullable=False)
+    user = relationship("User", back_populates="journals")
+    affirmations = relationship("Affirmation", back_populates="journal", cascade="all, delete-orphan")
