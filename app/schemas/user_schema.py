@@ -1,5 +1,6 @@
 import uuid
 from sqlalchemy import Column,String, Boolean, DateTime
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from sqlalchemy.dialects.postgresql import UUID
 from app.services.db import Base
@@ -16,3 +17,4 @@ class User(Base):
     profile_photo=Column(String,nullable=True) #new column added
     refresh_token=Column(String,nullable=True)
     refresh_token_expires_at = Column(DateTime, nullable=True)  # Optional: store expiry
+    journals=relationship("Journal", back_populates="user", cascade="all, delete-orphan")
