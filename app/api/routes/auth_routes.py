@@ -6,7 +6,7 @@ from fastapi import Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.models.auth import UserCreate,UserLogin,Token,UserPublic
 from app.services.db import get_session
-from app.dependencies.auth import get_current_user
+from app.dependencies.helpers import get_current_userId,get_user_profile
 import random
 from datetime import timezone,timedelta,datetime
 from app.core.config import REFRESH_TOKEN_EXPIRE_MINUTES
@@ -61,6 +61,7 @@ def register(user_data: UserCreate, db: Session = Depends(get_session), response
 # Login user
 @router.post("/auth/login",response_model=Token)
 def login(user_login:UserLogin, db:Session=Depends(get_session), response:Response=None):
+    print("login triggered")
     # Check if user exists
     user=db.query(user_model.User).filter(user_model.User.email==user_login.email, user_model.User.is_active== True).first()
     if not user:
@@ -122,7 +123,7 @@ def refresh_token(request:Request, db: Session = Depends(get_session)):
             access_token=access_token,
             token_type="bearer"
         )
-    except HTTPException as e:
+    except HTTPException:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid refresh token",
@@ -131,7 +132,7 @@ def refresh_token(request:Request, db: Session = Depends(get_session)):
 
 # Logout user
 @router.post("/auth/logout")
-def logout(current_user: UserPublic = Depends(get_current_user), db: Session = Depends(get_session)):
+def logout(current_user: UserPublic = Depends(get_current_userId), db: Session = Depends(get_session)):
     # Get user from database using ID
     user = db.query(user_model.User).filter(user_model.User.id == current_user.id).first()
     
@@ -147,5 +148,5 @@ def logout(current_user: UserPublic = Depends(get_current_user), db: Session = D
     return {"message": "Successfully logged out"}
 
 @router.get("/auth/me",response_model=UserPublic)
-def get_profile(current_user:UserPublic=Depends(get_current_user)):
+def get_profile(current_user:UserPublic=Depends(get_user_profile)):
     return current_user
