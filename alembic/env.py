@@ -1,10 +1,11 @@
 from logging.config import fileConfig
-from dotenv import load_dotenv
 from sqlalchemy import engine_from_config,pool
+from app.core.config import DATABASE_URL
 from alembic import context
-import os
-load_dotenv()
-DATABASE_URL=os.getenv("DATABASE_URL")
+from app.schemas.user_schema import User
+from app.schemas.journals_schema import Journal
+from app.schemas.affirmations_schema import Affirmation
+
 config = context.config
 config.set_main_option("sqlalchemy.url",DATABASE_URL)
 
@@ -14,6 +15,7 @@ if config.config_file_name is not None:
 from app.services.db import Base
 
 target_metadata=Base.metadata
+
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
@@ -51,10 +53,10 @@ def run_migrations_online() -> None:
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
-    def include_object(object, name, type_, reflected, compare_to):
-        if type_ == "table" and compare_to is None:
-            return False  # Don't drop tables that aren't in metadata
-        return True
+    # def include_object(object, name, type_, reflected, compare_to):
+    #     if type_ == "table" and compare_to is None:
+    #         return False  # Don't drop tables that aren't in metadata
+    #     return True
 
 
     with connectable.connect() as connection:
@@ -62,8 +64,8 @@ def run_migrations_online() -> None:
         connection=connection,
         target_metadata=target_metadata,
         compare_type=True,
-        render_as_batch=True,
-        include_object=include_object
+        render_as_batch=True
+        # include_object=include_object
 )
 
 
