@@ -1,14 +1,14 @@
 from fastapi import FastAPI
-from app.api.routes import auth_routes
+from app.api.routes import auth_routes,journals_route
 from fastapi.middleware.cors import CORSMiddleware
-from app.services.db import engine
-from app.schemas import user_schema as user_model
+from app.services.db import engine,Base
+import app.schemas
 from contextlib import asynccontextmanager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
-        user_model.Base.metadata.create_all(bind=engine)
+        Base.metadata.create_all(bind=engine)
     except Exception as e:
         print(f"Database initialization failed: {e}")
         raise
@@ -25,6 +25,7 @@ app.add_middleware(
 )
 
 app.include_router(auth_routes.router,prefix="/api")
+app.include_router(journals_route.router,prefix="/api")
 
 @app.get("/")
 def root():
