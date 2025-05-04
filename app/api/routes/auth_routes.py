@@ -10,6 +10,8 @@ from app.dependencies.helpers import get_current_userId,get_user_profile
 import random
 from datetime import timezone,timedelta,datetime
 from app.core.config import REFRESH_TOKEN_EXPIRE_MINUTES
+from fastapi.responses import JSONResponse
+
 
 router=APIRouter()
 profileImg=["https://i.imghippo.com/files/RlV6585mKA.png","https://i.imghippo.com/files/fxla8778FLI.png","https://i.imghippo.com/files/mFFj4453sw.png"]
@@ -47,7 +49,7 @@ def register(user_data: UserCreate, db: Session = Depends(get_session), response
         new_user.refresh_token_expires_at=refresh_token_expire
         db.commit()
 
-        response.set_cookie(key="refresh_token",value=refresh_token,httponly=True,secure=False)
+        response.set_cookie(key="refresh_token",value=refresh_token,httponly=True,secure=True,samesite="None",path="/")
         return Token(
             access_token=access_token,
             token_type="bearer"
@@ -75,8 +77,8 @@ def login(user_login:UserLogin, db:Session=Depends(get_session), response:Respon
         user.refresh_token=refresh_token
         user.refresh_token_expires_at=refresh_token_expire
         db.commit()
-
-        response.set_cookie(key="refresh_token",value=refresh_token,httponly=True,secure=False)
+        
+        response.set_cookie(key="refresh_token",value=refresh_token,httponly=True,secure=True,samesite="None",path="/")
 
         return Token(
             access_token=access_token,
@@ -142,10 +144,19 @@ def logout(current_user: UserPublic = Depends(get_current_userId), db: Session =
             detail="User not found"
         )
     # Clear refresh token
+    
     user.refresh_token = None
     user.refresh_token_expires_at=None
     db.commit()    
-    return {"message": "Successfully logged out"}
+    response = JSONResponse(content={"message": "Successfully logged out"})
+    response.delete_cookie(
+        key="refresh_token",
+        path="/",
+        httponly=True,
+        samesite="None",
+        secure=True
+    )
+    return response
 
 @router.get("/auth/me",response_model=UserPublic)
 def get_profile(current_user:UserPublic=Depends(get_user_profile)):

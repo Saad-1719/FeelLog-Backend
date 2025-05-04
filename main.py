@@ -15,13 +15,17 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(title="FeelLog", version="1.0.0", lifespan=lifespan)
+origins = [
+    "http://localhost:5173",  # frontend local dev
+    "https://feel-log-frontend.vercel.app",  # optional: production frontend
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"]
+    allow_headers=["*"],
 )
 
 app.include_router(auth_routes.router,prefix="/api")
