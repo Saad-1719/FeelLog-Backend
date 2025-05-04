@@ -1,9 +1,9 @@
 from fastapi import FastAPI
-from app.api.routes import auth_routes,journals_route
+from app.api.routes import auth_routes, journals_route
 from fastapi.middleware.cors import CORSMiddleware
-from app.services.db import engine,Base
-import app.schemas
+from app.services.db import engine, Base
 from contextlib import asynccontextmanager
+from mangum import Mangum
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -15,9 +15,10 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(title="FeelLog", version="1.0.0", lifespan=lifespan)
+
 origins = [
-    "http://localhost:5173",  # frontend local dev
-    "https://feel-log-frontend.vercel.app",  # optional: production frontend
+    "http://localhost:5173",
+    "https://feel-log-frontend.vercel.app",
 ]
 
 app.add_middleware(
@@ -28,9 +29,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth_routes.router,prefix="/api")
-app.include_router(journals_route.router,prefix="/api")
+app.include_router(auth_routes.router, prefix="/api")
+app.include_router(journals_route.router, prefix="/api")
 
 @app.get("/")
 def root():
-    return{"message":"Welcome to FeelLog Backend"}
+    return {"message": "Welcome to FeelLog Backend"}
+
+# 👇 Wrap FastAPI app for Vercel/Lambda
+handler = Mangum(app)
