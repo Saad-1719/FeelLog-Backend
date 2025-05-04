@@ -3,6 +3,7 @@ from sqlalchemy import engine_from_config,pool
 from app.core.config import DATABASE_URL
 from alembic import context
 from app.schemas.user_schema import User
+from app.schemas.token_schema import RefreshToken
 from app.schemas.journals_schema import Journal
 from app.schemas.affirmations_schema import Affirmation
 
@@ -15,6 +16,7 @@ if config.config_file_name is not None:
 from app.services.db import Base
 
 target_metadata=Base.metadata
+print("Registered tables:", list(Base.metadata.tables.keys()))
 
 
 def run_migrations_offline() -> None:
