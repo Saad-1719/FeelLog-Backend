@@ -15,3 +15,4 @@ bcrypt==4.3.0
 pyjwt
 alembic
 fastapi-csrf-protect
+mangum
