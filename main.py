@@ -3,7 +3,8 @@ from app.api.routes import auth_routes, journals_route
 from fastapi.middleware.cors import CORSMiddleware
 from app.services.db import engine, Base
 from contextlib import asynccontextmanager
-from mangum import Mangum
+# from mangum import Mangum
+from app.core.config import DATABASE_URL
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -34,7 +35,8 @@ app.include_router(journals_route.router, prefix="/api")
 
 @app.get("/")
 def root():
+    print(f"DATABASE URL: {DATABASE_URL}")
     return {"message": "Welcome to FeelLog Backend"}
 
-# 👇 Wrap FastAPI app for Vercel/Lambda
-handler = Mangum(app)
+# # 👇 Wrap FastAPI app for Vercel/Lambda
+# handler = Mangum(app)
