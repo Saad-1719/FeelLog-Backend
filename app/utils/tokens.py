@@ -3,7 +3,13 @@ from typing import Optional
 from fastapi import HTTPException, status
 import jwt
 from app.models.auth import TokenData
-from app.core.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_MINUTES
+from app.core.config import (
+    SECRET_KEY,
+    ALGORITHM,
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    REFRESH_TOKEN_EXPIRE_MINUTES,
+)
+
 
 # JWT token creation
 def create_access_token(data: dict, expire_delta: Optional[timedelta] = None) -> str:
@@ -21,10 +27,13 @@ def create_access_token(data: dict, expire_delta: Optional[timedelta] = None) ->
     if expire_delta:
         expire = datetime.now(timezone.utc) + expire_delta
     else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(timezone.utc) + timedelta(
+            minutes=ACCESS_TOKEN_EXPIRE_MINUTES
+        )
     to_encode.update({"exp": expire, "type": "access"})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
 
 # JWT token refresh
 def create_refresh_token(data: dict, expire_delta: Optional[timedelta] = None) -> str:
@@ -42,10 +51,13 @@ def create_refresh_token(data: dict, expire_delta: Optional[timedelta] = None) -
     if expire_delta:
         expire = datetime.now(timezone.utc) + expire_delta
     else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=REFRESH_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(timezone.utc) + timedelta(
+            minutes=REFRESH_TOKEN_EXPIRE_MINUTES
+        )
     to_encode.update({"exp": expire, "type": "refresh"})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
 
 # Decode JWT access token
 def decode_access_token(token: str) -> TokenData:
@@ -69,21 +81,22 @@ def decode_access_token(token: str) -> TokenData:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid Token",
-                headers={"WWW-Authenticate": "Bearer"}
+                headers={"WWW-Authenticate": "Bearer"},
             )
         return TokenData(user_id=user_id, type=token_type)
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token has expired",
-            headers={"WWW-Authenticate": "Bearer"}
+            headers={"WWW-Authenticate": "Bearer"},
         )
     except jwt.PyJWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid Token",
-            headers={"WWW-Authenticate": "Bearer"}
+            headers={"WWW-Authenticate": "Bearer"},
         )
+
 
 # Decode JWT refresh token
 def decode_refresh_token(token: str) -> TokenData:
@@ -107,18 +120,18 @@ def decode_refresh_token(token: str) -> TokenData:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid Token",
-                headers={"WWW-Authenticate": "Bearer"}
+                headers={"WWW-Authenticate": "Bearer"},
             )
         return TokenData(user_id=user_id, type=token_type)
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token has expired",
-            headers={"WWW-Authenticate": "Bearer"}
+            headers={"WWW-Authenticate": "Bearer"},
         )
     except jwt.PyJWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid Token",
-            headers={"WWW-Authenticate": "Bearer"}
+            headers={"WWW-Authenticate": "Bearer"},
         )
