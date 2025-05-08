@@ -5,27 +5,29 @@ from app.services.db import get_session
 from app.dependencies.helpers import get_current_userId
 from app.schemas import journals_schema, affirmations_schema
 from app.models.journals import JournalBase, JournalReponse
-from transformers import AutoModelForSequenceClassification, AutoTokenizer, pipeline
+from transformers import pipeline
 from app.core.config import GEMINI_API_KEY
-from datetime import date, datetime, timezone
+from datetime import datetime
 import warnings
 import google.generativeai as genai
 import json
 import re
-
+from functools import lru_cache
 
 warnings.filterwarnings("ignore", message="Some weights of the model checkpoint")
 
+# Configure Gemini client
 client = genai.configure(api_key=GEMINI_API_KEY)
 genai_model = genai.GenerativeModel("gemini-2.0-flash")
 
+# Define FastAPI router
 router = APIRouter()
 
-# Load model and tokenizer directly
-model_name = "cardiffnlp/twitter-roberta-base-sentiment-latest"
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForSequenceClassification.from_pretrained(model_name)
-sentiment_pipeline = pipeline("sentiment-analysis", model=model, tokenizer=tokenizer)
+# Lazy-load sentiment pipeline
+@lru_cache(maxsize=1)
+def get_sentiment_pipeline():
+    return pipeline("text-classification", model="cardiffnlp/twitter-roberta-base-sentiment-latest")
+
 
 
 @router.post("/add_journal", response_model=JournalReponse)
@@ -41,7 +43,7 @@ def add_journal(
     created_at = datetime.now()
 
     # Use the pipeline for sentiment analysis
-    sentiment = sentiment_pipeline(journal_content)[0]
+    sentiment = get_sentiment_pipeline()(journal_content)[0]
     label = sentiment["label"]
     probability = sentiment["score"]
 
