@@ -5,7 +5,6 @@ from app.services.db import get_session
 from app.dependencies.helpers import get_current_userId
 from app.schemas import journals_schema, affirmations_schema
 from app.models.journals import JournalBase, JournalReponse
-from transformers import pipeline
 from app.core.config import GEMINI_API_KEY
 from datetime import datetime
 import warnings
@@ -23,13 +22,6 @@ genai_model = genai.GenerativeModel("gemini-2.0-flash")
 # Define FastAPI router
 router = APIRouter()
 
-# # Lazy-load sentiment pipeline
-# @lru_cache(maxsize=1)
-# def get_sentiment_pipeline():
-#     return pipeline("text-classification", model="cardiffnlp/twitter-roberta-base-sentiment-latest")
-
-
-
 @router.post("/add_journal", response_model=JournalReponse)
 def add_journal(
     journal_input: JournalBase,
@@ -42,8 +34,6 @@ def add_journal(
     user_id = user.id
     created_at = datetime.now()
 
-    # Use the pipeline for sentiment analysis
-    # sentiment = get_sentiment_pipeline()(journal_content)[0]
     prompt_to_analyze_journal_sentiment=f"""You are a compassionate and emotionally intelligent sentiment analyst. Your role is to read a person's short journal entry or reflection and determine the underlying emotional tone. Your analysis should reflect nuance and empathy, capturing the complexity of human emotions.
 
             Your output should:

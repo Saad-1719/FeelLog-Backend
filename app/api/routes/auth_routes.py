@@ -64,7 +64,7 @@ def register(
         MAX_SESSIONS = 5
         refresh_tokens = (
             db.query(RefreshToken)
-            .filter(RefreshToken.user_id == existing_active_user.id)
+            .filter(RefreshToken.user_id == new_user.id)
             .order_by(RefreshToken.expires_at.asc())
             .all()
         )
