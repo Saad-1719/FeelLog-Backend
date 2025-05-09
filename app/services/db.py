@@ -8,12 +8,7 @@ if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable not set.")
 
 engine = create_engine(
-    DATABASE_URL,
-    poolclass=QueuePool,
-    pool_size=5,
-    max_overflow=10,
-    pool_timeout=120,
-    pool_recycle=1800,
+    DATABASE_URL
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
