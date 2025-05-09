@@ -39,4 +39,4 @@ def root():
     return {"message": "Welcome to FeelLog Backend"}
 
 # # 👇 Wrap FastAPI app for Vercel/Lambda
-handler = Mangum(app)
+# handler = Mangum(app)
