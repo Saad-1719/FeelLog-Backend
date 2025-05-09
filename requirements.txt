@@ -2,7 +2,7 @@ fastapi
 uvicorn
 pydantic
 bson
-passlib
+passlib[bcrypt]
 python-dotenv
 sqlalchemy
 psycopg2-binary
@@ -10,7 +10,7 @@ pydantic_settings
 jose
 alembic
 pydantic[email]
-bcrypt==4.1.0
+bcrypt==4.3.0
 pyjwt
 alembic
 google-generativeai
