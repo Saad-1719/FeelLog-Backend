@@ -23,10 +23,10 @@ genai_model = genai.GenerativeModel("gemini-2.0-flash")
 # Define FastAPI router
 router = APIRouter()
 
-# Lazy-load sentiment pipeline
-@lru_cache(maxsize=1)
-def get_sentiment_pipeline():
-    return pipeline("text-classification", model="cardiffnlp/twitter-roberta-base-sentiment-latest")
+# # Lazy-load sentiment pipeline
+# @lru_cache(maxsize=1)
+# def get_sentiment_pipeline():
+#     return pipeline("text-classification", model="cardiffnlp/twitter-roberta-base-sentiment-latest")
 
 
 
@@ -43,18 +43,57 @@ def add_journal(
     created_at = datetime.now()
 
     # Use the pipeline for sentiment analysis
-    sentiment = get_sentiment_pipeline()(journal_content)[0]
-    label = sentiment["label"]
-    probability = sentiment["score"]
+    # sentiment = get_sentiment_pipeline()(journal_content)[0]
+    prompt_to_analyze_journal_sentiment=f"""You are a compassionate and emotionally intelligent sentiment analyst. Your role is to read a person's short journal entry or reflection and determine the underlying emotional tone. Your analysis should reflect nuance and empathy, capturing the complexity of human emotions.
+
+            Your output should:
+            - Identify whether the sentiment is positive, negative, or neutral.
+            - Account for mixed emotions and determine the dominant sentiment.
+            - Include a probability score (0.00–100.00) representing your confidence in the classification, based on the clarity and consistency of the sentiment.
+            - Be returned in a valid JSON format only with no explanations or extra text.
+              Example Input:
+            "I’m grateful for my family, but lately I’ve been feeling disconnected and tired all the time."
+
+            Example Output:
+            {{
+            "label": "negative",
+            "probability": 78.25
+            }}
+            
+            Instructions:
+            Now analyze the following input:
+            "{journal_content}"
+
+            Respond only in the following JSON format:
+
+            {{
+            "label": "positive/negative/neutral",
+            "probability": XX.XX
+            }}"""
+    
+    response_sentiment = genai_model.generate_content(contents=prompt_to_analyze_journal_sentiment)
+    raw_sentiment_text = re.sub(r"```json|```", "", response_sentiment.text).strip()
+
+    try:
+        sentiment_json = json.loads(raw_sentiment_text)
+        label = sentiment_json["label"]
+        probability = float(sentiment_json["probability"])
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Invalid sentiment analysis format from Gemini."
+        )
 
     new_journal = journals_schema.Journal(
         title=journal_title,
         content=journal_content,
         user_id=user_id,
         sentiment_label=label,
-        sentiment_score=round(probability * 100, 2),
+        sentiment_score=round(probability, 2),
         created_at=created_at,
     )
+    
+    
 
     try:
         db.add(new_journal)
@@ -139,6 +178,6 @@ def add_journal(
         title=journal_title,
         content=journal_content,
         sentiment_label=label,
-        sentiment_probability=round(probability * 100, 2),
+        sentiment_probability=round(probability, 2),
         output=json_response,  # May be None if not negative
     )
