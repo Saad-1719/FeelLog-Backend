@@ -45,4 +45,4 @@ def root():
 
 # Wrap FastAPI app for Vercel serverless deployment
 # Comment this out for local development if needed
-handler = Mangum(app)
+# handler = Mangum(app)
