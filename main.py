@@ -3,7 +3,7 @@ from app.api.routes import auth_routes, journals_route
 from fastapi.middleware.cors import CORSMiddleware
 from app.services.db import engine, Base
 from contextlib import asynccontextmanager
-# from mangum import Mangum
+from mangum import Mangum
 from app.core.config import DATABASE_URL
 
 @asynccontextmanager
@@ -39,4 +39,4 @@ def root():
     return {"message": "Welcome to FeelLog Backend"}
 
 # # 👇 Wrap FastAPI app for Vercel/Lambda
-# handler = Mangum(app)
+handler = Mangum(app)
