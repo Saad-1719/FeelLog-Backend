@@ -5,14 +5,14 @@ from sqlalchemy.orm import Session
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordBearer
 from app.schemas import user_schema
-from app.models.auth import UserPublic
+from app.models.auth import UserProfile
 
 oauth2_schema = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 
 def get_user_profile(
     token: str = Depends(oauth2_schema), db: Session = Depends(get_session)
-) -> UserPublic:
+) -> UserProfile:
     try:
         token_data = decode_access_token(token)
         if token_data.type != "access":
@@ -35,7 +35,7 @@ def get_user_profile(
                 detail="User not found",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        return UserPublic.model_validate(user)
+        return UserProfile.model_validate(user)
 
     except Exception as e:
         raise HTTPException(

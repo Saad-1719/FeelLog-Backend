@@ -6,9 +6,8 @@ from pydantic import (
     ValidationInfo,
     ConfigDict,
 )
-from datetime import datetime, timezone
 from typing import Optional
-from uuid import UUID, uuid4
+from uuid import UUID
 
 
 class UserBase(BaseModel):
@@ -34,11 +33,11 @@ class UserCreate(UserBase):
         return confirm_password
 
 
-class UserPublic(UserBase):
-    id: UUID
-    created_at: datetime
-    profile_photo: str  # Add profile photo field
-    model_config = ConfigDict(from_attributes=True)
+# class UserPublic(UserBase):
+#     id: UUID
+#     # created_at: datetime
+#     # profile_photo: str  # Add profile photo field
+#     model_config = ConfigDict(from_attributes=True)
 
 
 class UserLogin(BaseModel):
@@ -59,4 +58,12 @@ class TokenData(BaseModel):
 
 class UserId(BaseModel):
     id: UUID
+    model_config = ConfigDict(from_attributes=True)
+
+
+class UserProfile(BaseModel):
+    # id: UUID
+    email: EmailStr
+    full_name: str
+    profile_photo: str
     model_config = ConfigDict(from_attributes=True)

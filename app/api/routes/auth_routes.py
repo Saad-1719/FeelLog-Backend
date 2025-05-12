@@ -7,7 +7,7 @@ from app.utils.tokens import (
     decode_refresh_token,
 )
 from sqlalchemy.orm import Session
-from app.models.auth import UserCreate, UserLogin, Token, UserPublic
+from app.models.auth import UserCreate, UserLogin, Token, UserProfile,UserId
 from app.services.db import get_session
 from app.dependencies.helpers import get_current_userId, get_user_profile
 from fastapi.responses import JSONResponse
@@ -19,9 +19,13 @@ from app.core.config import REFRESH_TOKEN_EXPIRE_MINUTES
 
 router = APIRouter()
 profileImg = [
-    "https://i.imghippo.com/files/RlV6585mKA.png",
-    "https://i.imghippo.com/files/fxla8778FLI.png",
-    "https://i.imghippo.com/files/mFFj4453sw.png",
+    "https://res.cloudinary.com/dpb5t5j0u/image/upload/v1747079669/botttsNeutral-1746256710350_puiqlo.png",
+    "https://res.cloudinary.com/dpb5t5j0u/image/upload/v1747079669/botttsNeutral-1746256774171_1_ofa2ob.png",
+    "https://res.cloudinary.com/dpb5t5j0u/image/upload/v1747079669/botttsNeutral-1746256688992_pvraef.jpg",
+    "https://res.cloudinary.com/dpb5t5j0u/image/upload/v1747079668/botttsNeutral-1746256505220_lygmxv.jpg",
+    "https://res.cloudinary.com/dpb5t5j0u/image/upload/v1747079668/botttsNeutral-1746256670007_tjmezj.jpg",
+    "https://res.cloudinary.com/dpb5t5j0u/image/upload/v1747079668/botttsNeutral-1746256659205_jndnqj.jpg",
+    "https://res.cloudinary.com/dpb5t5j0u/image/upload/v1747079668/botttsNeutral-1746256592697_b0zlkl.jpg",
 ]
 
 
@@ -230,7 +234,7 @@ def refresh_token(request: Request, db: Session = Depends(get_session)):
 # Logout user
 @router.post("/auth/logout")
 def logout(
-    current_user: UserPublic = Depends(get_current_userId),
+    current_user: UserId = Depends(get_current_userId),
     db: Session = Depends(get_session),
     request: Request = None,
 ):
@@ -268,6 +272,6 @@ def logout(
 
 
 # Get profile (unchanged)
-@router.get("/auth/me", response_model=UserPublic)
-def get_profile(current_user: UserPublic = Depends(get_user_profile)):
+@router.get("/auth/me", response_model=UserProfile)
+def get_profile(current_user: UserProfile = Depends(get_user_profile)):
     return current_user
