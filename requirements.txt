@@ -14,4 +14,3 @@ bcrypt==4.3.0
 pyjwt
 alembic
 google-generativeai
-mangum

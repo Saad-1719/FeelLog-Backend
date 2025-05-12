@@ -1,17 +1,17 @@
 from fastapi import HTTPException, Depends, status, APIRouter
-from sqlalchemy.orm import Session
-from app.models.auth import UserPublic
+from sqlalchemy.orm import Session, joinedload
 from app.services.db import get_session
 from app.dependencies.helpers import get_current_userId
 from app.schemas import journals_schema, affirmations_schema
-from app.models.journals import JournalBase, JournalReponse
+from app.models.journals import JournalBase, JournalReponse, AllJournalsAndAffirmations
+from typing import List
+from app.models.auth import UserId
 from app.core.config import GEMINI_API_KEY
 from datetime import datetime
 import warnings
 import google.generativeai as genai
 import json
 import re
-from functools import lru_cache
 
 warnings.filterwarnings("ignore", message="Some weights of the model checkpoint")
 
@@ -22,11 +22,12 @@ genai_model = genai.GenerativeModel("gemini-2.0-flash")
 # Define FastAPI router
 router = APIRouter()
 
+
 @router.post("/add_journal", response_model=JournalReponse)
 def add_journal(
     journal_input: JournalBase,
     db: Session = Depends(get_session),
-    user: UserPublic = Depends(get_current_userId),
+    user: UserId = Depends(get_current_userId),
 ):
     journal_title = journal_input.title
     journal_content = journal_input.content
@@ -34,7 +35,7 @@ def add_journal(
     user_id = user.id
     created_at = datetime.now()
 
-    prompt_to_analyze_journal_sentiment=f"""You are a compassionate and emotionally intelligent sentiment analyst. Your role is to read a person's short journal entry or reflection and determine the underlying emotional tone. Your analysis should reflect nuance and empathy, capturing the complexity of human emotions.
+    prompt_to_analyze_journal_sentiment = f"""You are a compassionate and emotionally intelligent sentiment analyst. Your role is to read a person's short journal entry or reflection and determine the underlying emotional tone. Your analysis should reflect nuance and empathy, capturing the complexity of human emotions.
 
             Your output should:
             - Identify whether the sentiment is positive, negative, or neutral.
@@ -60,18 +61,20 @@ def add_journal(
             "label": "positive/negative/neutral",
             "probability": XX.XX
             }}"""
-    
-    response_sentiment = genai_model.generate_content(contents=prompt_to_analyze_journal_sentiment)
+
+    response_sentiment = genai_model.generate_content(
+        contents=prompt_to_analyze_journal_sentiment
+    )
     raw_sentiment_text = re.sub(r"```json|```", "", response_sentiment.text).strip()
 
     try:
         sentiment_json = json.loads(raw_sentiment_text)
         label = sentiment_json["label"]
         probability = float(sentiment_json["probability"])
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Invalid sentiment analysis format from Gemini."
+            detail="Invalid sentiment analysis format from Gemini.",
         )
 
     new_journal = journals_schema.Journal(
@@ -82,14 +85,12 @@ def add_journal(
         sentiment_score=round(probability, 2),
         created_at=created_at,
     )
-    
-    
 
     try:
         db.add(new_journal)
         db.commit()
         db.refresh(new_journal)
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Error in writing data to db",
@@ -116,7 +117,7 @@ def add_journal(
         4. I learn and grow, even when things feel confusing or hard.  
         5. I give myself permission to rest and recharge without guilt.
 
-        Now, generate 5 affirmations based on this input:
+        Now, generate 2 affirmations based on this input:
         "{journal_content}"
         
         Respond ONLY in the following JSON format without explanations:
@@ -127,9 +128,7 @@ def add_journal(
             "affirmations": [
                 "It's okay to feel overwhelmed—I'm doing my best, and that's enough right now.",
                 "Even tough days pass, and I have the strength to keep moving forward.",
-                "I am not alone—connection with friends brings me comfort and light.",
-                "I learn and grow, even when things feel confusing or hard.",
-                "I give myself permission to rest and recharge without guilt."
+
             ]
         }}"""
 
@@ -153,7 +152,7 @@ def add_journal(
                 db.add(add_affirmation)
                 db.commit()
                 db.refresh(add_affirmation)
-            except Exception as e:
+            except Exception:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Error in writing data to db",
@@ -169,5 +168,29 @@ def add_journal(
         content=journal_content,
         sentiment_label=label,
         sentiment_probability=round(probability, 2),
-        output=json_response,  # May be None if not negative
+        output=json_response,
     )
+
+
+@router.get("/get_all_journals", response_model=List[AllJournalsAndAffirmations])
+def fetch_all_journals(
+    currentUser: UserId = Depends(get_current_userId),
+    db: Session = Depends(get_session),
+):
+    try:
+        if currentUser:
+            all_journals = (
+                db.query(journals_schema.Journal)
+                .filter(currentUser.id == journals_schema.Journal.user_id)
+                .options(joinedload(journals_schema.Journal.affirmations))
+                .all()
+            )
+
+            for journal in all_journals:
+                for affirmation in journal.affirmations:
+                    if isinstance(affirmation.affirmations, str):
+                        affirmation.affirmations = json.loads(affirmation.affirmations)
+
+            return all_journals
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

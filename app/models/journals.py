@@ -1,7 +1,7 @@
-from pydantic import BaseModel, Field
-from bson import ObjectId
-from typing import Optional, Any
+from pydantic import BaseModel, Field,ConfigDict
+from typing import Optional, Any, List
 from datetime import datetime
+from uuid import UUID
 
 
 class JournalBase(BaseModel):
@@ -11,31 +11,29 @@ class JournalBase(BaseModel):
     updated_at: Optional[datetime] = Field(None, description="Journal update date")
 
 
-class JournalCreate(JournalBase):
-    pass
-
-
-class JournalInDB(JournalBase):
-    id: int = Field(..., description="Journal ID")
-    user_id: str = Field(..., description="User ID of the journal owner")
-
-    class Config:
-        arbitrary_types_allowed = True
-        json_encoders = {ObjectId: str}
-        json_schema_extra = {
-            "example": {
-                "title": "My First Journal",
-                "content": "This is the content of my first journal.",
-                "created_at": "2023-10-01T12:00:00Z",
-                "updated_at": "2023-10-01T12:00:00Z",
-                "user_id": "603d2f4f1c4ae5b8d8e4a0b0",
-            }
-        }
-
-
 class JournalReponse(BaseModel):
     title: str
     content: str
     sentiment_label: str
     sentiment_probability: float
     output: Optional[Any] = None
+
+
+class AffirmationsRead(BaseModel):
+    id: UUID
+    affirmations: List[str]
+
+    # journal_id:UUID
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AllJournalsAndAffirmations(BaseModel):
+    content: str
+    sentiment_label: str
+    created_at: datetime
+    title: str
+    id: UUID
+    sentiment_score: float
+    affirmations: List[AffirmationsRead] = []  # Include affirmations here
+
+    model_config = ConfigDict(from_attributes=True)
