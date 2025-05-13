@@ -7,9 +7,9 @@ from app.utils.tokens import (
     decode_refresh_token,
 )
 from sqlalchemy.orm import Session
-from app.models.auth import UserCreate, UserLogin, Token, UserProfile,UserId
+from app.models.auth import UserCreate, UserLogin, Token, UserProfile, UserId
 from app.services.db import get_session
-from app.dependencies.helpers import get_current_userId, get_user_profile
+from app.dependencies.auth import get_current_userId, get_user_profile
 from fastapi.responses import JSONResponse
 from uuid import uuid4
 from datetime import timezone, timedelta, datetime
