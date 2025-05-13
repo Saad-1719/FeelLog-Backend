@@ -10,5 +10,9 @@ class Affirmation(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     input_summary = Column(String, nullable=True)
     affirmations = Column(JSON, nullable=False)
-    journal_id = Column(UUID(as_uuid=True), ForeignKey("journals.id"), nullable=False)
+    journal_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("journals.id", ondelete="CASCADE"),
+        nullable=False,
+    )
     journal = relationship("Journal", back_populates="affirmations")

@@ -1,23 +1,21 @@
 from fastapi import HTTPException, Depends, status, APIRouter
 from sqlalchemy.orm import Session, joinedload
 from app.services.db import get_session
-from app.dependencies.helpers import get_current_userId
+from app.dependencies.auth import get_current_userId
 from app.schemas import journals_schema, affirmations_schema
-from app.models.journals import JournalBase, JournalReponse, AllJournalsAndAffirmations
+from app.models.journals import (
+    JournalBase,
+    JournalReponse,
+    AllJournalsAndAffirmations,
+    JournalDeleteRequest,
+    JournalUpdateRequest,
+    SentimentDataResponse,SentimentDataRequest
+)
 from typing import List
 from app.models.auth import UserId
-from app.core.config import GEMINI_API_KEY
 from datetime import datetime
-import warnings
-import google.generativeai as genai
 import json
-import re
-
-warnings.filterwarnings("ignore", message="Some weights of the model checkpoint")
-
-# Configure Gemini client
-client = genai.configure(api_key=GEMINI_API_KEY)
-genai_model = genai.GenerativeModel("gemini-2.0-flash")
+from app.utils.utils import analyze_sentiments, generate_affirmations
 
 # Define FastAPI router
 router = APIRouter()
@@ -31,47 +29,25 @@ def add_journal(
 ):
     journal_title = journal_input.title
     journal_content = journal_input.content
+    affirmations_json = None
 
-    user_id = user.id
-    created_at = datetime.now()
-
-    prompt_to_analyze_journal_sentiment = f"""You are a compassionate and emotionally intelligent sentiment analyst. Your role is to read a person's short journal entry or reflection and determine the underlying emotional tone. Your analysis should reflect nuance and empathy, capturing the complexity of human emotions.
-
-            Your output should:
-            - Identify whether the sentiment is positive, negative, or neutral.
-            - Account for mixed emotions and determine the dominant sentiment.
-            - Include a probability score (0.00–100.00) representing your confidence in the classification, based on the clarity and consistency of the sentiment.
-            - Be returned in a valid JSON format only with no explanations or extra text.
-              Example Input:
-            "I’m grateful for my family, but lately I’ve been feeling disconnected and tired all the time."
-
-            Example Output:
-            {{
-            "label": "negative",
-            "probability": 78.25
-            }}
-            
-            Instructions:
-            Now analyze the following input:
-            "{journal_content}"
-
-            Respond only in the following JSON format:
-
-            {{
-            "label": "positive/negative/neutral",
-            "probability": XX.XX
-            }}"""
-
-    response_sentiment = genai_model.generate_content(
-        contents=prompt_to_analyze_journal_sentiment
-    )
-    raw_sentiment_text = re.sub(r"```json|```", "", response_sentiment.text).strip()
+    if not journal_content.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Journal content cannot be empty",
+        )
 
     try:
-        sentiment_json = json.loads(raw_sentiment_text)
+        sentiment_json = analyze_sentiments(journal_content)
+        if (
+            not isinstance(sentiment_json, dict)
+            or "label" not in sentiment_json
+            or "probability" not in sentiment_json
+        ):
+            raise ValueError("Invalid sentiment analysis response")
         label = sentiment_json["label"]
         probability = float(sentiment_json["probability"])
-    except Exception:
+    except (json.JSONDecodeError, ValueError):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Invalid sentiment analysis format from Gemini.",
@@ -80,70 +56,21 @@ def add_journal(
     new_journal = journals_schema.Journal(
         title=journal_title,
         content=journal_content,
-        user_id=user_id,
+        user_id=user.id,
         sentiment_label=label,
         sentiment_score=round(probability, 2),
-        created_at=created_at,
+        created_at=datetime.now(),
     )
 
     try:
         db.add(new_journal)
         db.commit()
         db.refresh(new_journal)
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Error in writing data to db",
-        )
-
-    prompt = f"""You are a compassionate and emotionally intelligent affirmation coach. Your job is to read a person's short input text, extract their emotional and situational context, and then generate 5 personalized, uplifting affirmations that directly support their mental and emotional well-being.
-
-        Your affirmations should:
-        - Acknowledge and validate the person’s feelings (e.g., stress, sadness, exhaustion, relief).
-        - Focus on resilience, self-worth, and encouragement based on the scenario.
-        - Be supportive, empowering, and gently optimistic.
-        - Avoid toxic positivity; reflect a realistic but hopeful tone.
-        - Be concise (1–2 sentences per affirmation), direct, and emotionally attuned.
-
-        Only return the 5 affirmations in a numbered list, without repeating the input text or adding extra explanations.
-
-        Example Input:
-        "I had a rough day at university today. The lectures were really difficult to understand and we were given a lot of assignments. I am really depressed and overwhelmed. However, hanging out with my friends made me happy."
-
-        Example Output:
-        1. It's okay to feel overwhelmed—I'm doing my best, and that's enough right now.  
-        2. Even tough days pass, and I have the strength to keep moving forward.  
-        3. I am not alone—connection with friends brings me comfort and light.  
-        4. I learn and grow, even when things feel confusing or hard.  
-        5. I give myself permission to rest and recharge without guilt.
-
-        Now, generate 2 affirmations based on this input:
-        "{journal_content}"
-        
-        Respond ONLY in the following JSON format without explanations:
-
-        ```json
-        {{
-            "input_summary": "User is feeling overwhelmed and sad due to difficult university lectures and heavy assignments but finds relief in spending time with friends.",
-            "affirmations": [
-                "It's okay to feel overwhelmed—I'm doing my best, and that's enough right now.",
-                "Even tough days pass, and I have the strength to keep moving forward.",
-
-            ]
-        }}"""
-
-    json_response = None
-
-    if label.lower() == "negative":
-        response = genai_model.generate_content(contents=prompt)
-
-        raw_text = response.text
-        cleaned_text = re.sub(r"```json|```", "", raw_text).strip()
-        try:
-            json_response = json.loads(cleaned_text)
-            affirmations_json = json.dumps(json_response["affirmations"], indent=2)
-            input_summary = json_response["input_summary"]
+        if label.lower() in ["negative", "neg"]:
+            affirmations = generate_affirmations(journal_content)
             try:
+                affirmations_json = json.dumps(affirmations["affirmations"], indent=2)
+                input_summary = affirmations["input_summary"]
                 add_affirmation = affirmations_schema.Affirmation(
                     input_summary=input_summary,
                     affirmations=affirmations_json,
@@ -152,23 +79,21 @@ def add_journal(
                 db.add(add_affirmation)
                 db.commit()
                 db.refresh(add_affirmation)
-            except Exception:
+            except (json.JSONDecodeError, KeyError):
                 raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Error in writing data to db",
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Invalid affirmation response format from Gemini.",
                 )
-        except Exception:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="The response from the external service was not in a valid format. Please try again later.",
-            )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Error in writing data to db: {str(e)}",
+        )
 
     return JournalReponse(
         title=journal_title,
         content=journal_content,
-        sentiment_label=label,
-        sentiment_probability=round(probability, 2),
-        output=json_response,
+        affirmations=json.loads(affirmations_json) if affirmations_json else [],
     )
 
 
@@ -178,19 +103,164 @@ def fetch_all_journals(
     db: Session = Depends(get_session),
 ):
     try:
-        if currentUser:
-            all_journals = (
-                db.query(journals_schema.Journal)
-                .filter(currentUser.id == journals_schema.Journal.user_id)
-                .options(joinedload(journals_schema.Journal.affirmations))
-                .all()
-            )
+        all_journals = (
+            db.query(journals_schema.Journal)
+            .filter(currentUser.id == journals_schema.Journal.user_id)
+            .options(joinedload(journals_schema.Journal.affirmations))
+            .all()
+        )
 
-            for journal in all_journals:
-                for affirmation in journal.affirmations:
-                    if isinstance(affirmation.affirmations, str):
+        for journal in all_journals:
+            for affirmation in journal.affirmations:
+                if isinstance(affirmation.affirmations, str):
+                    try:
                         affirmation.affirmations = json.loads(affirmation.affirmations)
+                    except json.JSONDecodeError:
+                        affirmation.affirmations = []
 
-            return all_journals
+        return all_journals
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post("/delete_journal")
+def delete_journal(
+    request: JournalDeleteRequest,
+    currentUser: UserId = Depends(get_current_userId),
+    db: Session = Depends(get_session),
+):
+    try:
+        result = (
+            db.query(journals_schema.Journal)
+            .filter(
+                journals_schema.Journal.id == request.journal_id,
+                journals_schema.Journal.user_id == currentUser.id,
+            )
+            .delete()
+        )
+        db.commit()
+        return {"message": "Journal deleted successfully", "deleted": result}
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.put("/update_journal", response_model=JournalReponse)
+def update_journal(
+    request: JournalUpdateRequest,
+    currentUser: UserId = Depends(get_current_userId),
+    db: Session = Depends(get_session),
+):
+    try:
+        journal_content = request.content
+        if not journal_content.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Journal content cannot be empty",
+            )
+
+        sentiment = analyze_sentiments(journal_content)
+        try:
+            if (
+                not isinstance(sentiment, dict)
+                or "label" not in sentiment
+                or "probability" not in sentiment
+            ):
+                raise ValueError("Invalid sentiment analysis response")
+            label = sentiment["label"]
+            probability = float(sentiment["probability"])
+        except (json.JSONDecodeError, ValueError):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Invalid sentiment analysis format from Gemini.",
+            )
+
+        affirmations_json = None
+
+        journal = (
+            db.query(journals_schema.Journal)
+            .filter(
+                journals_schema.Journal.id == request.journal_id,
+                journals_schema.Journal.user_id == currentUser.id,
+            )
+            .first()
+        )
+        if not journal:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Journal not found or not owned by user",
+            )
+        journal.title = request.title
+        journal.content = request.content
+        journal.sentiment_label = label
+        journal.sentiment_score = round(probability, 2)
+
+        if label.lower() in ["negative", "neg"]:
+            affirmations = generate_affirmations(journal_content)
+            try:
+                affirmations_json = json.dumps(affirmations["affirmations"], indent=2)
+                input_summary = affirmations["input_summary"]
+                affirmation_entry = (
+                    db.query(affirmations_schema.Affirmation)
+                    .filter(
+                        affirmations_schema.Affirmation.journal_id == request.journal_id
+                    )
+                    .first()
+                )
+                if affirmation_entry:
+                    affirmation_entry.input_summary = input_summary
+                    affirmation_entry.affirmations = affirmations_json
+                else:
+                    new_affirmation = affirmations_schema.Affirmation(
+                        input_summary=input_summary,
+                        affirmations=affirmations_json,
+                        journal_id=request.journal_id,
+                    )
+                    db.add(new_affirmation)
+                    db.commit()
+            except (json.JSONDecodeError, KeyError):
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Invalid affirmation response format from Gemini.",
+                )
+        else:
+            db.query(affirmations_schema.Affirmation).filter(
+                affirmations_schema.Affirmation.journal_id == request.journal_id
+            ).delete()
+            db.commit()
+
+        return JournalReponse(
+            title=request.title,
+            content=journal_content,
+            affirmations=json.loads(affirmations_json) if affirmations_json else [],
+        )
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post("/get_sentiment_overview", response_model=SentimentDataResponse)
+def get_sentiment_overview(
+    currentUser: UserId = Depends(get_current_userId),
+    db: Session = Depends(get_session)
+):
+    if not currentUser:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+
+    journal_entries = db.query(journals_schema.Journal).filter(
+        journals_schema.Journal.user_id == currentUser.id
+    ).order_by(journals_schema.Journal.created_at.asc()).all()
+
+    if not journal_entries:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail="Journal not found")
+
+    response_data = [
+        SentimentDataRequest(
+            entry_id=entry.id,
+            title=entry.title,
+            timestamp=entry.created_at,
+            sentiment_label=entry.sentiment_label,
+            sentiment_score=entry.sentiment_score,
+        )
+        for entry in journal_entries
+    ]
+
+    return SentimentDataResponse(data=response_data)

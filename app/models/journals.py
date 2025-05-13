@@ -1,7 +1,7 @@
-from pydantic import BaseModel, Field,ConfigDict
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, Any, List
-from datetime import datetime
 from uuid import UUID
+from datetime import datetime
 
 
 class JournalBase(BaseModel):
@@ -14,16 +14,12 @@ class JournalBase(BaseModel):
 class JournalReponse(BaseModel):
     title: str
     content: str
-    sentiment_label: str
-    sentiment_probability: float
-    output: Optional[Any] = None
+    affirmations: Optional[Any] = None
 
 
 class AffirmationsRead(BaseModel):
     id: UUID
     affirmations: List[str]
-
-    # journal_id:UUID
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -37,3 +33,22 @@ class AllJournalsAndAffirmations(BaseModel):
     affirmations: List[AffirmationsRead] = []  # Include affirmations here
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class JournalDeleteRequest(BaseModel):
+    journal_id: UUID
+
+
+class JournalUpdateRequest(BaseModel):
+    journal_id: UUID
+    title: str
+    content: str
+
+class SentimentDataRequest(BaseModel):
+    title: str
+    timestamp:datetime
+    sentiment_label: str
+    sentiment_score: float
+
+class SentimentDataResponse(BaseModel):
+    data: List[SentimentDataRequest]
