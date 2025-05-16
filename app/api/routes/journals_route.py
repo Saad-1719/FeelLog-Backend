@@ -21,7 +21,14 @@ from app.utils.encryption_utils import encrypt_data,decrypt_data
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-limiter = Limiter(key_func=get_remote_address)
+def custom_key_func(request: Request):
+    # Skip rate limiting for OPTIONS requests
+    if request.method == "OPTIONS":
+        return None
+    # Regular rate limiting for all other methods
+    return get_remote_address(request)
+
+limiter = Limiter(key_func=custom_key_func)
 
 # Define FastAPI router
 router = APIRouter()
@@ -150,12 +157,10 @@ request: Request = None,
 
 
 @router.post("/delete_journal")
-@limiter.limit("5/minute")
 def delete_journal(
     request: JournalDeleteRequest,
     currentUser: UserId = Depends(get_current_userId),
     db: Session = Depends(get_session),
-requestObj: Request = None,
 ):
     try:
         result = (
@@ -173,12 +178,10 @@ requestObj: Request = None,
 
 
 @router.put("/update_journal", response_model=JournalReponse)
-@limiter.limit("5/minute")
 def update_journal(
         request: JournalUpdateRequest,
         currentUser: UserId = Depends(get_current_userId),
         db: Session = Depends(get_session),
-requestObj: Request = None,
 ):
     try:
         journal_title = request.title
