@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Response, Request, Depends, HTTPException, status
 from app.schemas import user_schema as user_model
-from app.utils.password import verify_password, hash_password
-from app.utils.tokens import (
+from app.utils.password_utils import verify_password, hash_password
+from app.utils.tokens_utils import (
     create_refresh_token,
     create_access_token,
     decode_refresh_token,
@@ -15,6 +15,10 @@ from datetime import timezone, timedelta, datetime
 from app.schemas.token_schema import RefreshToken
 import random
 from app.core.config import REFRESH_TOKEN_EXPIRE_MINUTES
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+limiter=Limiter(key_func=get_remote_address)
 
 router = APIRouter()
 profileImg = [
@@ -30,8 +34,9 @@ profileImg = [
 
 # Register a new user
 @router.post("/auth/register", response_model=Token)
+@limiter.limit("5/minute")
 def register(
-    user_data: UserCreate, db: Session = Depends(get_session), response: Response = None
+    user_data: UserCreate, db: Session = Depends(get_session), response: Response = None,request:Request=None
 ):
     existing_active_user = (
         db.query(user_model.User)
@@ -101,8 +106,9 @@ def register(
 
 # Login user
 @router.post("/auth/login", response_model=Token)
+@limiter.limit("5/minute")
 def login(
-    user_login: UserLogin, db: Session = Depends(get_session), response: Response = None
+    user_login: UserLogin, db: Session = Depends(get_session), response: Response = None,request: Request = None
 ):
     user = (
         db.query(user_model.User)
@@ -163,6 +169,7 @@ def login(
 
 # Refresh token
 @router.post("/auth/refresh", response_model=Token)
+@limiter.limit("10/minute")
 def refresh_token(request: Request, db: Session = Depends(get_session)):
 
     refresh_token = request.cookies.get("refresh_token")
@@ -224,6 +231,7 @@ def refresh_token(request: Request, db: Session = Depends(get_session)):
 
 # Logout user
 @router.post("/auth/logout")
+@limiter.limit("5/minute")
 def logout(
     current_user: UserId = Depends(get_current_userId),
     db: Session = Depends(get_session),
@@ -264,5 +272,6 @@ def logout(
 
 # Get profile (unchanged)
 @router.get("/auth/me", response_model=UserProfile)
-def get_profile(current_user: UserProfile = Depends(get_user_profile)):
+@limiter.limit("8/minute")
+def get_profile(current_user: UserProfile = Depends(get_user_profile),request: Request = None):
     return current_user

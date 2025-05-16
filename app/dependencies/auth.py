@@ -1,6 +1,6 @@
 from app.models.auth import UserId
 from app.services.db import get_session
-from app.utils.tokens import decode_access_token
+from app.utils.tokens_utils import decode_access_token
 from sqlalchemy.orm import Session
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordBearer
