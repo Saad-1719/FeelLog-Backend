@@ -18,8 +18,13 @@ from app.core.config import REFRESH_TOKEN_EXPIRE_MINUTES
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-limiter=Limiter(key_func=get_remote_address)
+# Use the custom key function from main.py
+def custom_key_func(request: Request):
+    if request.method == "OPTIONS":
+        return None
+    return get_remote_address(request)
 
+limiter = Limiter(key_func=custom_key_func)
 router = APIRouter()
 profileImg = [
     "https://res.cloudinary.com/dpb5t5j0u/image/upload/v1747079669/botttsNeutral-1746256710350_puiqlo.png",

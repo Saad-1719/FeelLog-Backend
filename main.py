@@ -8,7 +8,16 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-limiter=Limiter(key_func=get_remote_address)
+# Create a custom rate limiter that exempts OPTIONS requests
+def custom_key_func(request: Request):
+    # Skip rate limiting for OPTIONS requests
+    if request.method == "OPTIONS":
+        return None
+    # Regular rate limiting for all other methods
+    return get_remote_address(request)
+
+limiter = Limiter(key_func=custom_key_func)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -20,7 +29,7 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(title="FeelLog", version="1.0.0", lifespan=lifespan)
-
+#
 app.state.limiter = limiter #type: ignore
 app.add_exception_handler(RateLimitExceeded,_rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
@@ -28,14 +37,17 @@ app.add_middleware(SlowAPIMiddleware)
 origins = [
     "http://localhost:5173",
     "https://www.feellog.site",
+"https://feel-log-backend.vercel.app",
+    "http://127.0.0.1:8000"
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["GET PUT POST DELETE"],
+    allow_methods=["*"],  # Add OPTIONS explicitly
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 app.include_router(auth_routes.router, prefix="/api")
