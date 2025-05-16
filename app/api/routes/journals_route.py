@@ -1,4 +1,4 @@
-from fastapi import HTTPException, Depends, status, APIRouter
+from fastapi import HTTPException, Depends, status, APIRouter,Request
 from sqlalchemy.orm import Session, joinedload
 from app.services.db import get_session
 from app.dependencies.auth import get_current_userId
@@ -16,17 +16,24 @@ from app.models.auth import UserId
 from datetime import datetime
 from sqlalchemy import desc
 import json
-from app.utils.utils import analyze_sentiments, generate_affirmations
+from app.utils.affirmations_utils import analyze_sentiments, generate_affirmations
+from app.utils.encryption_utils import encrypt_data,decrypt_data
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+limiter = Limiter(key_func=get_remote_address)
 
 # Define FastAPI router
 router = APIRouter()
 
 
 @router.post("/add_journal", response_model=JournalReponse)
+@limiter.limit("8/minute")
 def add_journal(
     journal_input: JournalBase,
     db: Session = Depends(get_session),
     user: UserId = Depends(get_current_userId),
+request: Request = None,
 ):
     journal_title = journal_input.title
     journal_content = journal_input.content
@@ -53,10 +60,11 @@ def add_journal(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Invalid sentiment analysis format from Gemini.",
         )
-
+    encrypted_title = encrypt_data(journal_title)
+    encrypted_content = encrypt_data(journal_content)
     new_journal = journals_schema.Journal(
-        title=journal_title,
-        content=journal_content,
+        title=encrypted_title,
+        content=encrypted_content,
         user_id=user.id,
         sentiment_label=label,
         sentiment_score=round(probability, 2),
@@ -72,9 +80,11 @@ def add_journal(
             try:
                 affirmations_json = json.dumps(affirmations["affirmations"], indent=2)
                 input_summary = affirmations["input_summary"]
+                encrypted_input_summary = encrypt_data(input_summary)
+                encrypted_affirmations = encrypt_data(affirmations_json)
                 add_affirmation = affirmations_schema.Affirmation(
-                    input_summary=input_summary,
-                    affirmations=affirmations_json,
+                    input_summary=encrypted_input_summary,
+                    affirmations=encrypted_affirmations,
                     journal_id=new_journal.id,
                 )
                 db.add(add_affirmation)
@@ -99,9 +109,11 @@ def add_journal(
 
 
 @router.get("/get_all_journals", response_model=List[AllJournalsAndAffirmations])
+@limiter.limit("20/minute")
 def fetch_all_journals(
     currentUser: UserId = Depends(get_current_userId),
     db: Session = Depends(get_session),
+request: Request = None,
 ):
     try:
         all_journals = (
@@ -111,24 +123,39 @@ def fetch_all_journals(
             .all()
         )
 
+        decrypted_journals = []
+
         for journal in all_journals:
+
+            journal.title=decrypt_data(journal.title)
+            journal.content=decrypt_data(journal.content)
+
             for affirmation in journal.affirmations:
-                if isinstance(affirmation.affirmations, str):
+
+                if affirmation.input_summary:
+                    affirmation.input_summary = decrypt_data(affirmation.input_summary)
+
+                if affirmation.affirmations:
+                    decrypted_affirmations = decrypt_data(affirmation.affirmations)
                     try:
-                        affirmation.affirmations = json.loads(affirmation.affirmations)
+                        affirmation.affirmations = json.loads(decrypted_affirmations)
                     except json.JSONDecodeError:
                         affirmation.affirmations = []
 
-        return all_journals
+            decrypted_journals.append(journal)
+
+        return decrypted_journals
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @router.post("/delete_journal")
+@limiter.limit("5/minute")
 def delete_journal(
     request: JournalDeleteRequest,
     currentUser: UserId = Depends(get_current_userId),
     db: Session = Depends(get_session),
+requestObj: Request = None,
 ):
     try:
         result = (
@@ -146,13 +173,17 @@ def delete_journal(
 
 
 @router.put("/update_journal", response_model=JournalReponse)
+@limiter.limit("5/minute")
 def update_journal(
-    request: JournalUpdateRequest,
-    currentUser: UserId = Depends(get_current_userId),
-    db: Session = Depends(get_session),
+        request: JournalUpdateRequest,
+        currentUser: UserId = Depends(get_current_userId),
+        db: Session = Depends(get_session),
+requestObj: Request = None,
 ):
     try:
+        journal_title = request.title
         journal_content = request.content
+
         if not journal_content.strip():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -162,9 +193,9 @@ def update_journal(
         sentiment = analyze_sentiments(journal_content)
         try:
             if (
-                not isinstance(sentiment, dict)
-                or "label" not in sentiment
-                or "probability" not in sentiment
+                    not isinstance(sentiment, dict)
+                    or "label" not in sentiment
+                    or "probability" not in sentiment
             ):
                 raise ValueError("Invalid sentiment analysis response")
             label = sentiment["label"]
@@ -190,8 +221,10 @@ def update_journal(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Journal not found or not owned by user",
             )
-        journal.title = request.title
-        journal.content = request.content
+
+        # Encrypt updated data
+        journal.title = encrypt_data(journal_title)
+        journal.content = encrypt_data(journal_content)
         journal.sentiment_label = label
         journal.sentiment_score = round(probability, 2)
 
@@ -200,6 +233,11 @@ def update_journal(
             try:
                 affirmations_json = json.dumps(affirmations["affirmations"], indent=2)
                 input_summary = affirmations["input_summary"]
+
+                # Encrypt affirmation data
+                encrypted_input_summary = encrypt_data(input_summary)
+                encrypted_affirmations = encrypt_data(affirmations_json)
+
                 affirmation_entry = (
                     db.query(affirmations_schema.Affirmation)
                     .filter(
@@ -208,29 +246,30 @@ def update_journal(
                     .first()
                 )
                 if affirmation_entry:
-                    affirmation_entry.input_summary = input_summary
-                    affirmation_entry.affirmations = affirmations_json
+                    affirmation_entry.input_summary = encrypted_input_summary
+                    affirmation_entry.affirmations = encrypted_affirmations
                 else:
                     new_affirmation = affirmations_schema.Affirmation(
-                        input_summary=input_summary,
-                        affirmations=affirmations_json,
+                        input_summary=encrypted_input_summary,
+                        affirmations=encrypted_affirmations,
                         journal_id=request.journal_id,
                     )
                     db.add(new_affirmation)
-                    db.commit()
+                db.commit()
             except (json.JSONDecodeError, KeyError):
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="Invalid affirmation response format from Gemini.",
                 )
         else:
+            # Delete affirmations if sentiment is not negative
             db.query(affirmations_schema.Affirmation).filter(
                 affirmations_schema.Affirmation.journal_id == request.journal_id
             ).delete()
             db.commit()
 
         return JournalReponse(
-            title=request.title,
+            title=journal_title,
             content=journal_content,
             affirmations=json.loads(affirmations_json) if affirmations_json else [],
         )
@@ -239,9 +278,11 @@ def update_journal(
 
 
 @router.post("/get_sentiment_overview", response_model=SentimentDataResponse)
+@limiter.limit("8/minute")
 def get_sentiment_overview(
-    currentUser: UserId = Depends(get_current_userId),
-    db: Session = Depends(get_session)
+        currentUser: UserId = Depends(get_current_userId),
+        db: Session = Depends(get_session),
+request: Request = None,
 ):
     if not currentUser:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
@@ -251,12 +292,12 @@ def get_sentiment_overview(
     ).order_by(journals_schema.Journal.created_at.asc()).all()
 
     if not journal_entries:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail="Journal not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Journal not found")
 
     response_data = [
         SentimentDataRequest(
             entry_id=entry.id,
-            title=entry.title,
+            title=decrypt_data(entry.title),  # Decrypt title
             timestamp=entry.created_at,
             sentiment_label=entry.sentiment_label,
             sentiment_score=entry.sentiment_score,

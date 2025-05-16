@@ -45,6 +45,7 @@ class JournalUpdateRequest(BaseModel):
     content: str
 
 class SentimentDataRequest(BaseModel):
+    entry_id: UUID
     title: str
     timestamp:datetime
     sentiment_label: str
