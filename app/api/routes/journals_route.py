@@ -14,6 +14,7 @@ from app.models.journals import (
 from typing import List
 from app.models.auth import UserId
 from datetime import datetime
+from sqlalchemy import desc
 import json
 from app.utils.utils import analyze_sentiments, generate_affirmations
 
@@ -106,7 +107,7 @@ def fetch_all_journals(
         all_journals = (
             db.query(journals_schema.Journal)
             .filter(currentUser.id == journals_schema.Journal.user_id)
-            .options(joinedload(journals_schema.Journal.affirmations))
+            .options(joinedload(journals_schema.Journal.affirmations)).order_by(desc(journals_schema.Journal.created_at))
             .all()
         )
 
