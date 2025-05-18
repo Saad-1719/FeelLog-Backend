@@ -7,7 +7,15 @@ from app.utils.tokens_utils import (
     decode_refresh_token,
 )
 from sqlalchemy.orm import Session
-from app.models.auth import UserCreate, UserLogin, Token, UserProfile, UserId,EmailRequest,ResetPassword
+from app.models.auth import (
+    UserCreate,
+    UserLogin,
+    Token,
+    UserProfile,
+    UserId,
+    EmailRequest,
+    ResetPassword,
+)
 from app.services.db import get_session
 from app.dependencies.auth import get_current_userId, get_user_profile
 from fastapi.responses import JSONResponse
@@ -19,11 +27,13 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from app.utils.email_utils import send_otp_email
 
+
 # Use the custom key function from main.py
 def custom_key_func(request: Request):
     if request.method == "OPTIONS":
         return None
     return get_remote_address(request)
+
 
 limiter = Limiter(key_func=custom_key_func)
 router = APIRouter()
@@ -42,7 +52,10 @@ profileImg = [
 @router.post("/auth/register", response_model=Token)
 @limiter.limit("5/minute")
 def register(
-    user_data: UserCreate, db: Session = Depends(get_session), response: Response = None,request:Request=None
+    user_data: UserCreate,
+    db: Session = Depends(get_session),
+    response: Response = None,
+    request: Request = None,
 ):
     existing_active_user = (
         db.query(user_model.User)
@@ -103,9 +116,7 @@ def register(
             samesite="None",
             path="/",
         )
-        return Token(
-            access_token=access_token, token_type="bearer"
-        )
+        return Token(access_token=access_token, token_type="bearer")
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
@@ -114,7 +125,10 @@ def register(
 @router.post("/auth/login", response_model=Token)
 @limiter.limit("5/minute")
 def login(
-    user_login: UserLogin, db: Session = Depends(get_session), response: Response = None,request: Request = None
+    user_login: UserLogin,
+    db: Session = Depends(get_session),
+    response: Response = None,
+    request: Request = None,
 ):
     user = (
         db.query(user_model.User)
@@ -166,9 +180,7 @@ def login(
             samesite="None",
             path="/",
         )
-        return Token(
-            access_token=access_token, token_type="bearer"
-        )
+        return Token(access_token=access_token, token_type="bearer")
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
@@ -224,9 +236,7 @@ def refresh_token(request: Request, db: Session = Depends(get_session)):
             )
 
         access_token = create_access_token(data={"sub": str(user.id)})
-        return Token(
-            access_token=access_token, token_type="bearer"
-        )
+        return Token(access_token=access_token, token_type="bearer")
     except HTTPException as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -242,14 +252,14 @@ def logout(
     current_user: UserId = Depends(get_current_userId),
     db: Session = Depends(get_session),
     request: Request = None,
-    response:Response=None
+    response: Response = None,
 ):
     try:
         refresh_token = request.cookies.get("refresh_token")
         refresh_token_entry = (
             db.query(RefreshToken)
             .filter(
-                RefreshToken.refresh_token==refresh_token,
+                RefreshToken.refresh_token == refresh_token,
                 RefreshToken.user_id == current_user.id,
             )
             .first()
@@ -271,41 +281,81 @@ def logout(
         return response
     except Exception:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Error During Logout"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Error During Logout"
         )
 
 
 @router.post("/forget_password")
 @limiter.limit("10/hour")
-async def forget_password(body:EmailRequest, db: Session = Depends(get_session),request: Request=None,response:Response=None):
+async def forget_password(
+    body: EmailRequest,
+    db: Session = Depends(get_session),
+    request: Request = None,
+    response: Response = None,
+):
 
-    user=db.query(user_model.User).filter(user_model.User.email==body.email).first()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    try:
+        user = (
+            db.query(user_model.User)
+            .filter(user_model.User.email == body.email)
+            .first()
+        )
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+            )
 
-    otp=f"{random.randint(100000,999999)}"
-    user.otp_codes=otp
-    user.opt_expires=datetime.now(timezone.utc)+timedelta(minutes=15)
-    db.commit()
-    await send_otp_email(body.email,otp)
-    return {"msg":"OTP send to your email"}
+        otp = f"{random.randint(100000,999999)}"
+        user.otp_codes = otp
+        user.opt_expires = datetime.now(timezone.utc) + timedelta(minutes=15)
+        db.commit()
+        await send_otp_email(body.email, otp)
+        return {"msg": "OTP send to your email"}
+    except HTTPException as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Unable to send OTP email"
+        )
+
 
 @router.post("/reset_password")
-def reset_password(request:ResetPassword, db: Session = Depends(get_session), requestObj: Request=None,response:Response=None):
-    user=db.query(user_model.User).filter(user_model.User.email==request.email).first()
-    if not user or user.otp_codes != request.otp or user.opt_expires.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid OTP Code",
+def reset_password(
+    request: ResetPassword,
+    db: Session = Depends(get_session),
+    requestObj: Request = None,
+    response: Response = None,
+):
+    try:
+        user = (
+            db.query(user_model.User)
+            .filter(user_model.User.email == request.email)
+            .first()
         )
-    user.hashed_password = hash_password(request.password)
-    user.otp_codes = None
-    user.opt_expires = None
-    db.commit()
-    return {"msg":"Password Reset Successful"}
+        if (
+            not user
+            or user.otp_codes != request.otp
+            or user.opt_expires.replace(tzinfo=timezone.utc)
+            < datetime.now(timezone.utc)
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid OTP Code",
+            )
+        user.hashed_password = hash_password(request.password)
+        user.otp_codes = None
+        user.opt_expires = None
+        db.commit()
+        return {"msg": "Password Reset Successful"}
+    except HTTPException as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Unable to reset password"
+        )
+
 
 @router.get("/auth/me", response_model=UserProfile)
 @limiter.limit("8/minute")
-def get_profile(current_user: UserProfile = Depends(get_user_profile),request: Request = None,response:Response=None):
+def get_profile(
+    current_user: UserProfile = Depends(get_user_profile),
+    request: Request = None,
+    response: Response = None,
+):
     return current_user

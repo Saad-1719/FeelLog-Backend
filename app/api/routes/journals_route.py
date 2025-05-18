@@ -1,4 +1,4 @@
-from fastapi import HTTPException, Depends, status, APIRouter,Request
+from fastapi import HTTPException, Depends, status, APIRouter, Request
 from sqlalchemy.orm import Session, joinedload
 from app.services.db import get_session
 from app.dependencies.auth import get_current_userId
@@ -9,7 +9,8 @@ from app.models.journals import (
     AllJournalsAndAffirmations,
     JournalDeleteRequest,
     JournalUpdateRequest,
-    SentimentDataResponse,SentimentDataRequest
+    SentimentDataResponse,
+    SentimentDataRequest,
 )
 from typing import List
 from app.models.auth import UserId
@@ -17,9 +18,10 @@ from datetime import datetime
 from sqlalchemy import desc
 import json
 from app.utils.affirmations_utils import analyze_sentiments, generate_affirmations
-from app.utils.encryption_utils import encrypt_data,decrypt_data
+from app.utils.encryption_utils import encrypt_data, decrypt_data
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+
 
 def custom_key_func(request: Request):
     # Skip rate limiting for OPTIONS requests
@@ -27,6 +29,7 @@ def custom_key_func(request: Request):
         return None
     # Regular rate limiting for all other methods
     return get_remote_address(request)
+
 
 limiter = Limiter(key_func=custom_key_func)
 
@@ -40,7 +43,7 @@ def add_journal(
     journal_input: JournalBase,
     db: Session = Depends(get_session),
     user: UserId = Depends(get_current_userId),
-request: Request = None,
+    request: Request = None,
 ):
     journal_title = journal_input.title
     journal_content = journal_input.content
@@ -120,13 +123,14 @@ request: Request = None,
 def fetch_all_journals(
     currentUser: UserId = Depends(get_current_userId),
     db: Session = Depends(get_session),
-request: Request = None,
+    request: Request = None,
 ):
     try:
         all_journals = (
             db.query(journals_schema.Journal)
             .filter(currentUser.id == journals_schema.Journal.user_id)
-            .options(joinedload(journals_schema.Journal.affirmations)).order_by(desc(journals_schema.Journal.created_at))
+            .options(joinedload(journals_schema.Journal.affirmations))
+            .order_by(desc(journals_schema.Journal.created_at))
             .all()
         )
 
@@ -134,8 +138,8 @@ request: Request = None,
 
         for journal in all_journals:
 
-            journal.title=decrypt_data(journal.title)
-            journal.content=decrypt_data(journal.content)
+            journal.title = decrypt_data(journal.title)
+            journal.content = decrypt_data(journal.content)
 
             for affirmation in journal.affirmations:
 
@@ -179,9 +183,9 @@ def delete_journal(
 
 @router.put("/update_journal", response_model=JournalReponse)
 def update_journal(
-        request: JournalUpdateRequest,
-        currentUser: UserId = Depends(get_current_userId),
-        db: Session = Depends(get_session),
+    request: JournalUpdateRequest,
+    currentUser: UserId = Depends(get_current_userId),
+    db: Session = Depends(get_session),
 ):
     try:
         journal_title = request.title
@@ -196,9 +200,9 @@ def update_journal(
         sentiment = analyze_sentiments(journal_content)
         try:
             if (
-                    not isinstance(sentiment, dict)
-                    or "label" not in sentiment
-                    or "probability" not in sentiment
+                not isinstance(sentiment, dict)
+                or "label" not in sentiment
+                or "probability" not in sentiment
             ):
                 raise ValueError("Invalid sentiment analysis response")
             label = sentiment["label"]
@@ -280,32 +284,44 @@ def update_journal(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-@router.post("/get_sentiment_overview", response_model=SentimentDataResponse)
+@router.get("/get_sentiment_overview", response_model=SentimentDataResponse)
 @limiter.limit("8/minute")
 def get_sentiment_overview(
-        currentUser: UserId = Depends(get_current_userId),
-        db: Session = Depends(get_session),
-request: Request = None,
+    currentUser: UserId = Depends(get_current_userId),
+    db: Session = Depends(get_session),
+    request: Request = None,
 ):
-    if not currentUser:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+    try:
 
-    journal_entries = db.query(journals_schema.Journal).filter(
-        journals_schema.Journal.user_id == currentUser.id
-    ).order_by(journals_schema.Journal.created_at.asc()).all()
+        if not currentUser:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
 
-    if not journal_entries:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Journal not found")
-
-    response_data = [
-        SentimentDataRequest(
-            entry_id=entry.id,
-            title=decrypt_data(entry.title),  # Decrypt title
-            timestamp=entry.created_at,
-            sentiment_label=entry.sentiment_label,
-            sentiment_score=entry.sentiment_score,
+        journal_entries = (
+            db.query(journals_schema.Journal)
+            .filter(journals_schema.Journal.user_id == currentUser.id)
+            .order_by(journals_schema.Journal.created_at.asc())
+            .all()
         )
-        for entry in journal_entries
-    ]
 
-    return SentimentDataResponse(data=response_data)
+        if not journal_entries:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Journal not found"
+            )
+
+        response_data = [
+            SentimentDataRequest(
+                entry_id=entry.id,
+                title=decrypt_data(entry.title),  # Decrypt title
+                timestamp=entry.created_at,
+                sentiment_label=entry.sentiment_label,
+                sentiment_score=entry.sentiment_score,
+            )
+            for entry in journal_entries
+        ]
+
+        return SentimentDataResponse(data=response_data)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Error in processing request",
+        )

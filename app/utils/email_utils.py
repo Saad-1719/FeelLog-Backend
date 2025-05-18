@@ -2,6 +2,7 @@ from email.message import EmailMessage
 import aiosmtplib
 from app.core.config import EMAIL, APP_PASSWORD, PORT
 
+
 async def send_otp_email(to_email: str, otp: str):
     message = EmailMessage()
     message["From"] = f"FeelLog {EMAIL}"
@@ -9,7 +10,9 @@ async def send_otp_email(to_email: str, otp: str):
     message["Subject"] = "🔐 Your OTP Code - Secure Verification"
 
     # Plain text (fallback)
-    message.set_content(f"Your OTP code is: {otp}\nThis code will expire in 15 minutes.")
+    message.set_content(
+        f"Your OTP code is: {otp}\nThis code will expire in 15 minutes."
+    )
 
     # HTML version
     html_content = f"""
@@ -27,7 +30,7 @@ async def send_otp_email(to_email: str, otp: str):
       </body>
     </html>
     """
-    message.add_alternative(html_content, subtype='html')
+    message.add_alternative(html_content, subtype="html")
 
     await aiosmtplib.send(
         message,
@@ -35,5 +38,5 @@ async def send_otp_email(to_email: str, otp: str):
         port=PORT,
         start_tls=True,
         username=EMAIL,
-        password=APP_PASSWORD
+        password=APP_PASSWORD,
     )

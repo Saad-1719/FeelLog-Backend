@@ -32,13 +32,19 @@ class UserCreate(UserBase):
             raise ValueError("Passwords do not match")
         return confirm_password
 
+
 class EmailRequest(BaseModel):
     email: EmailStr
 
+
 class ResetPassword(EmailRequest):
-    otp:str = Field(..., description="OTP code")
-    password:str = Field(..., description="User password",min_length=6, max_length=100)
-    confirm_password:str = Field(..., description="Confirm password",min_length=6, max_length=100)
+    otp: str = Field(..., description="OTP code")
+    password: str = Field(
+        ..., description="User password", min_length=6, max_length=100
+    )
+    confirm_password: str = Field(
+        ..., description="Confirm password", min_length=6, max_length=100
+    )
 
     @field_validator("confirm_password")
     def check_password(cls, confirm_password: str, info: ValidationInfo) -> str:

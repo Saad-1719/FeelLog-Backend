@@ -44,12 +44,14 @@ class JournalUpdateRequest(BaseModel):
     title: str
     content: str
 
+
 class SentimentDataRequest(BaseModel):
     entry_id: UUID
     title: str
-    timestamp:datetime
+    timestamp: datetime
     sentiment_label: str
     sentiment_score: float
+
 
 class SentimentDataResponse(BaseModel):
     data: List[SentimentDataRequest]
