@@ -7,7 +7,7 @@ from app.utils.tokens_utils import (
     decode_refresh_token,
 )
 from sqlalchemy.orm import Session
-from app.models.auth import UserCreate, UserLogin, Token, UserProfile, UserId
+from app.models.auth import UserCreate, UserLogin, Token, UserProfile, UserId,EmailRequest,ResetPassword
 from app.services.db import get_session
 from app.dependencies.auth import get_current_userId, get_user_profile
 from fastapi.responses import JSONResponse
@@ -17,6 +17,7 @@ import random
 from app.core.config import REFRESH_TOKEN_EXPIRE_MINUTES
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from app.utils.email_utils import send_otp_email
 
 # Use the custom key function from main.py
 def custom_key_func(request: Request):
@@ -275,8 +276,36 @@ def logout(
         )
 
 
-# Get profile (unchanged)
+@router.post("/forget_password")
+@limiter.limit("10/hour")
+async def forget_password(body:EmailRequest, db: Session = Depends(get_session),request: Request=None,response:Response=None):
+
+    user=db.query(user_model.User).filter(user_model.User.email==body.email).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    otp=f"{random.randint(100000,999999)}"
+    user.otp_codes=otp
+    user.opt_expires=datetime.now(timezone.utc)+timedelta(minutes=15)
+    db.commit()
+    await send_otp_email(body.email,otp)
+    return {"msg":"OTP send to your email"}
+
+@router.post("/reset_password")
+def reset_password(request:ResetPassword, db: Session = Depends(get_session), requestObj: Request=None,response:Response=None):
+    user=db.query(user_model.User).filter(user_model.User.email==request.email).first()
+    if not user or user.otp_codes != request.otp or user.opt_expires.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid OTP Code",
+        )
+    user.hashed_password = hash_password(request.password)
+    user.otp_codes = None
+    user.opt_expires = None
+    db.commit()
+    return {"msg":"Password Reset Successful"}
+
 @router.get("/auth/me", response_model=UserProfile)
 @limiter.limit("8/minute")
-def get_profile(current_user: UserProfile = Depends(get_user_profile),request: Request = None):
+def get_profile(current_user: UserProfile = Depends(get_user_profile),request: Request = None,response:Response=None):
     return current_user
