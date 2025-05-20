@@ -26,6 +26,7 @@ from app.core.config import REFRESH_TOKEN_EXPIRE_MINUTES
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from app.utils.email_utils import send_otp_email
+from uuid import uuid4
 
 
 # Use the custom key function from main.py
@@ -100,8 +101,10 @@ def register(
             db.commit()
 
         # Store refresh token in RefreshToken table
+        session_id=str(uuid4())
         new_refresh_token = RefreshToken(
             user_id=new_user.id,
+            session_id=session_id,
             refresh_token=refresh_token,
             expires_at=refresh_token_expire,
         )
@@ -109,14 +112,14 @@ def register(
         db.commit()
 
         response.set_cookie(
-            key="refresh_token",
+            key=f"refresh_token_{session_id}",
             value=refresh_token,
             httponly=True,
             secure=True,
             samesite="None",
             path="/",
         )
-        return Token(access_token=access_token, token_type="bearer")
+        return Token(access_token=access_token, token_type="bearer",session_id=session_id)
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
@@ -146,6 +149,7 @@ def login(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
         )
     try:
+        session_id = str(uuid4())
         access_token = create_access_token(data={"sub": str(user.id)})
         refresh_token = create_refresh_token(data={"sub": str(user.id)})
         refresh_token_expire = datetime.now(timezone.utc) + timedelta(
@@ -166,6 +170,7 @@ def login(
         # Store refresh token in RefreshToken table
         new_refresh_token = RefreshToken(
             user_id=user.id,
+            session_id=session_id,
             refresh_token=refresh_token,
             expires_at=refresh_token_expire,
         )
@@ -173,14 +178,14 @@ def login(
         db.commit()
 
         response.set_cookie(
-            key="refresh_token",
+            key=f"refresh_token_{session_id}",
             value=refresh_token,
             httponly=True,
             secure=True,
             samesite="None",
             path="/",
         )
-        return Token(access_token=access_token, token_type="bearer")
+        return Token(access_token=access_token, token_type="bearer",session_id=session_id)
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
@@ -189,59 +194,71 @@ def login(
 @router.post("/auth/refresh", response_model=Token)
 @limiter.limit("10/minute")
 def refresh_token(request: Request, db: Session = Depends(get_session)):
-
-    refresh_token = request.cookies.get("refresh_token")
-    if not refresh_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Refresh token not found",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
     try:
-        payload = decode_refresh_token(refresh_token)
-        user_id = payload.user_id
-        refresh_token_entry = (
-            db.query(RefreshToken)
-            .filter(
-                RefreshToken.refresh_token == refresh_token,
-                RefreshToken.user_id == user_id,
-            )
-            .first()
-        )
-        if not refresh_token_entry:
+        session_id=request.headers.get("X-Session-ID")
+        if not session_id:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid refresh token",
-                headers={"WWW-Authenticate": "Bearer"},
+                detail="Invalid session id",
             )
-        if refresh_token_entry.expires_at.replace(tzinfo=timezone.utc) < datetime.now(
-            timezone.utc
-        ):
-            # db.delete(refresh_token_entry)
-            # db.commit()
+        refresh_token = request.cookies.get(f"refresh_token_{session_id}")
+        if not refresh_token:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Refresh token expired",
+                detail="Refresh token not found",
                 headers={"WWW-Authenticate": "Bearer"},
-            )
-        user = (
-            db.query(user_model.User)
-            .filter(user_model.User.id == user_id, user_model.User.is_active == True)
-            .first()
-        )
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
             )
 
-        access_token = create_access_token(data={"sub": str(user.id)})
-        return Token(access_token=access_token, token_type="bearer")
-    except HTTPException as e:
+        try:
+            payload = decode_refresh_token(refresh_token)
+            user_id = payload.user_id
+            refresh_token_entry = (
+                db.query(RefreshToken)
+                .filter(
+                    RefreshToken.session_id==session_id,
+                    RefreshToken.refresh_token == refresh_token,
+                    RefreshToken.user_id == user_id,
+                )
+                .first()
+            )
+            if not refresh_token_entry:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid refresh token",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            if refresh_token_entry.expires_at.replace(tzinfo=timezone.utc) < datetime.now(
+                timezone.utc
+            ):
+                # db.delete(refresh_token_entry)
+                # db.commit()
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Refresh token expired",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            user = (
+                db.query(user_model.User)
+                .filter(user_model.User.id == user_id, user_model.User.is_active == True)
+                .first()
+            )
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+                )
+
+            access_token = create_access_token(data={"sub": str(user.id)})
+            return Token(access_token=access_token, token_type="bearer",session_id=session_id)
+        except HTTPException as e:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=str(e),
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+    except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(e),
-            headers={"WWW-Authenticate": "Bearer"},
         )
 
 
@@ -249,39 +266,69 @@ def refresh_token(request: Request, db: Session = Depends(get_session)):
 @router.post("/auth/logout")
 @limiter.limit("5/minute")
 def logout(
-    current_user: UserId = Depends(get_current_userId),
     db: Session = Depends(get_session),
     request: Request = None,
     response: Response = None,
 ):
     try:
-        refresh_token = request.cookies.get("refresh_token")
+        session_id = request.headers.get("X-Session-ID")
+        if not session_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid session id",
+            )
+        refresh_token = request.cookies.get(f"refresh_token_{session_id}")
+        payload = decode_refresh_token(refresh_token)
+        user_id = payload.user_id
+        isUser=(db.query(user_model.User).filter(user_model.User.id == user_id).first())
+
+        if not isUser:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail="Invalid refresh token")
+
         refresh_token_entry = (
             db.query(RefreshToken)
             .filter(
+                RefreshToken.session_id==session_id,
                 RefreshToken.refresh_token == refresh_token,
-                RefreshToken.user_id == current_user.id,
+                RefreshToken.user_id == user_id,
             )
             .first()
         )
-
         if not refresh_token_entry:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
             )
 
+        if refresh_token_entry.expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
+            refresh_token_entry.refresh_token = None
+            refresh_token_entry.expires_at = None
+            db.commit()
+            response.delete_cookie(
+                key=f"refresh_token_{session_id}",
+                path="/",
+                httponly=True,
+                samesite="None",
+                secure=True,
+            )
+            return response
+
+        db.delete(refresh_token_entry)
+        db.commit()
+
         response = JSONResponse(content={"message": "Successfully logged out"})
         response.delete_cookie(
-            key="refresh_token",
+            key=f"refresh_token_{session_id}",
             path="/",
             httponly=True,
             samesite="None",
             secure=True,
         )
         return response
-    except Exception:
+    except HTTPException as e:
+        raise e
+    except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Error During Logout"
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Error During Logout{str(e)}"
         )
 
 
@@ -340,6 +387,8 @@ def reset_password(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid OTP Code",
             )
+
+
         user.hashed_password = hash_password(request.password)
         user.otp_codes = None
         user.opt_expires = None
