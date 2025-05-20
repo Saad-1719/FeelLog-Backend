@@ -48,8 +48,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["GET PUT POST DELETE"],
-    allow_headers=["X-Session-ID"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["X-Session-ID", "Content-Type", "Authorization"]
 )
 
 app.include_router(auth_routes.router, prefix="/api")
