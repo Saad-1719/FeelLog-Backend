@@ -1,4 +1,6 @@
-from fastapi import FastAPI,Request
+from http.client import HTTPException
+
+from fastapi import FastAPI,Request,HTTPException
 from app.api.routes import auth_routes, journals_route
 from fastapi.middleware.cors import CORSMiddleware
 from app.services.db import engine, Base
@@ -24,8 +26,9 @@ async def lifespan(app: FastAPI):
     try:
         Base.metadata.create_all(bind=engine)
     except Exception as e:
-        print(f"Database initialization failed: {e}")
-        raise
+        raise HTTPException(
+            detail=str(e)
+        )
     yield
 
 app = FastAPI(title="FeelLog", version="1.0.0", lifespan=lifespan)
@@ -45,9 +48,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],  # Add OPTIONS explicitly
-    allow_headers=["*"],
-    expose_headers=["*"],
+    allow_methods=["GET PUT POST DELETE"],
+    allow_headers=["X-Session-ID"],
 )
 
 app.include_router(auth_routes.router, prefix="/api")

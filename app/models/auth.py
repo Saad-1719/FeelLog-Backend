@@ -61,6 +61,7 @@ class UserLogin(BaseModel):
 
 class Token(BaseModel):
     access_token: str
+    session_id: str
     token_type: str = "bearer"
 
 
