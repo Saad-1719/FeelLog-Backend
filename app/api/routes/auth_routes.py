@@ -52,7 +52,7 @@ profileImg = [
 # Register a new user
 @router.post("/auth/register", response_model=Token)
 @limiter.limit("5/minute")
-async def register(
+def register(
     user_data: UserCreate,
     db: Session = Depends(get_session),
     response: Response = None,
@@ -115,7 +115,7 @@ async def register(
         )
         db.add(new_refresh_token)
         db.commit()
-        await send_onboard_email(new_user.email)
+        # await send_onboard_email(new_user.email)
 
         response.set_cookie(
             key=f"refresh_token_{session_id}",
