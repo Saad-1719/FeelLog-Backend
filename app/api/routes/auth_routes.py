@@ -17,7 +17,7 @@ from app.models.auth import (
     ResetPassword,
 )
 from app.services.db import get_session
-from app.dependencies.auth import get_current_userId, get_user_profile
+from app.dependencies.auth import get_user_profile
 from fastapi.responses import JSONResponse
 from datetime import timezone, timedelta, datetime
 from app.schemas.token_schema import RefreshToken
@@ -25,7 +25,7 @@ import random
 from app.core.config import REFRESH_TOKEN_EXPIRE_MINUTES
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from app.utils.email_utils import send_otp_email
+from app.utils.email_utils import send_otp_email,send_onboard_email
 from uuid import uuid4
 
 
@@ -52,12 +52,17 @@ profileImg = [
 # Register a new user
 @router.post("/auth/register", response_model=Token)
 @limiter.limit("5/minute")
-def register(
+async def register(
     user_data: UserCreate,
     db: Session = Depends(get_session),
     response: Response = None,
     request: Request = None,
 ):
+    if user_data.email == "info.feelLog@gmail.com":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email",
+        )
     existing_active_user = (
         db.query(user_model.User)
         .filter(
@@ -110,6 +115,7 @@ def register(
         )
         db.add(new_refresh_token)
         db.commit()
+        await send_onboard_email(new_user.email)
 
         response.set_cookie(
             key=f"refresh_token_{session_id}",

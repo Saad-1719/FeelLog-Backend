@@ -45,12 +45,13 @@ def analyze_sentiments(content: str) -> dict:
 def generate_affirmations(content: str) -> dict:
     prompt = f"""You are a compassionate and emotionally intelligent affirmation coach. Your job is to read a person's short input text, extract their emotional and situational context, and then generate 5 personalized, uplifting affirmations that directly support their mental and emotional well-being.
 
-           Your affirmations should:
-           - Acknowledge and validate the person’s feelings (e.g., stress, sadness, exhaustion, relief).
-           - Focus on resilience, self-worth, and encouragement based on the scenario.
-           - Be supportive, empowering, and gently optimistic.
-           - Avoid toxic positivity; reflect a realistic but hopeful tone.
-           - Be concise (1–2 sentences per affirmation), direct, and emotionally attuned.
+           Your affirmations must:
+            - Acknowledge and validate the person’s emotions (e.g., sadness, self-doubt, loneliness).
+            - Be supportive, emotionally attuned, and empowering—**but not overly heavy or wordy**.
+            - Be **short and digestible**: *no more than 10–13 words per affirmation*.
+            - Avoid "toxic positivity"—stay grounded, warm, and realistic.
+            - Use natural, affirming language someone could easily repeat anytime.
+
 
            Only return the 5 affirmations in a numbered list, without repeating the input text or adding extra explanations.
 
@@ -58,8 +59,8 @@ def generate_affirmations(content: str) -> dict:
            "I had a rough day at university today. The lectures were really difficult to understand and we were given a lot of assignments. I am really depressed and overwhelmed. However, hanging out with my friends made me happy."
 
            Example Output:
-           1. It's okay to feel overwhelmed—I'm doing my best, and that's enough right now.  
-           2. Even tough days pass, and I have the strength to keep moving forward.  
+           1. It's okay to feel overwhelmed—I'm doing my best.  
+           2. I have the strength to keep moving forward.  
            3. I am not alone—connection with friends brings me comfort and light.  
            4. I learn and grow, even when things feel confusing or hard.  
            5. I give myself permission to rest and recharge without guilt.
@@ -70,17 +71,18 @@ def generate_affirmations(content: str) -> dict:
            Respond ONLY in the following JSON format without explanations:
 
            ```json
-           {{
-               "input_summary": "User is feeling overwhelmed and sad due to difficult university lectures and heavy assignments but finds relief in spending time with friends.",
-               "affirmations": [
-                   "It's okay to feel overwhelmed—I'm doing my best, and that's enough right now.",
-                   "Even tough days pass, and I have the strength to keep moving forward.",
-                   "I am not alone—connection with friends brings me comfort and light.",  
-                   "I learn and grow, even when things feel confusing or hard.",  
-                   "I give myself permission to rest and recharge without guilt."
-               ]
-           }}"""
-
+            {{
+                "input_summary": "User is feeling overwhelmed and sad due to difficult university lectures and heavy assignments but finds relief in spending time with friends.",
+                "affirmations": [
+                    "It's okay to feel overwhelmed—I'm doing my best.",
+                    "I have the strength to keep going.",
+                    "Connection with friends brings me light and support.",
+                    "I learn and grow, even when it's tough.",
+                    "I deserve rest and kindness toward myself."
+                ]
+            }}
+"""
     response = genai_model.generate_content(contents=prompt)
+
     cleaned = re.sub(r"```json|```", "", response.text).strip()
     return json.loads(cleaned)

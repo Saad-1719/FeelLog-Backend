@@ -1,6 +1,6 @@
 from http.client import HTTPException
 
-from fastapi import FastAPI,Request,HTTPException
+from fastapi import FastAPI,Request,HTTPException,Response
 from app.api.routes import auth_routes, journals_route
 from fastapi.middleware.cors import CORSMiddleware
 from app.services.db import engine, Base
@@ -32,7 +32,20 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(title="FeelLog", version="1.0.0", lifespan=lifespan)
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response: Response = await call_next(request)
+
+    # Security Headers
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; object-src 'none';"
+    return response
+
+
 #
+
 app.state.limiter = limiter #type: ignore
 app.add_exception_handler(RateLimitExceeded,_rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
