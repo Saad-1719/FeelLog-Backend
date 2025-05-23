@@ -52,13 +52,13 @@ profileImg = [
 # Register a new user
 @router.post("/auth/register", response_model=Token)
 @limiter.limit("5/minute")
-def register(
+async def register(
     user_data: UserCreate,
     db: Session = Depends(get_session),
     response: Response = None,
     request: Request = None,
 ):
-    if user_data.email == "info.feelLog@gmail.com":
+    if user_data.email == "info.feellog@gmail.com":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email",
@@ -115,7 +115,7 @@ def register(
         )
         db.add(new_refresh_token)
         db.commit()
-        # await send_onboard_email(new_user.email)
+        await send_onboard_email(new_user.email)
 
         response.set_cookie(
             key=f"refresh_token_{session_id}",
@@ -236,8 +236,8 @@ def refresh_token(request: Request, db: Session = Depends(get_session)):
             if refresh_token_entry.expires_at.replace(tzinfo=timezone.utc) < datetime.now(
                 timezone.utc
             ):
-                # db.delete(refresh_token_entry)
-                # db.commit()
+                db.delete(refresh_token_entry)
+                db.commit()
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Refresh token expired",

@@ -304,9 +304,7 @@ def get_sentiment_overview(
         )
 
         if not journal_entries:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Journal not found"
-            )
+            return SentimentDataResponse(data=[])
 
         response_data = [
             SentimentDataRequest(

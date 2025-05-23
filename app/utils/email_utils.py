@@ -1,78 +1,72 @@
-from email.message import EmailMessage
-import aiosmtplib
+from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
+from pydantic import EmailStr
 from app.core.config import EMAIL, APP_PASSWORD, PORT
 
-async def send_onboard_email(to_email: str):
-    message = EmailMessage()
-    message['From'] = "FeelLog <noreply@feellog.app>"
-    message['To'] = to_email
-    message['Subject'] = "🎉 Welcome to FeelLog!"
+conf = ConnectionConfig(
+    MAIL_USERNAME=EMAIL,
+    MAIL_PASSWORD=APP_PASSWORD,
+    MAIL_FROM="FeelLog <noreply@feellog.app>",
+    MAIL_PORT=PORT,
+    MAIL_SERVER="smtp.gmail.com",
+    USE_CREDENTIALS=True,
+    MAIL_SSL_TLS=False,
+    MAIL_STARTTLS=True,
+)
 
-    message.set_content(
-        f"""Hi there,
+async def send_onboard_email(to_email: EmailStr):
+    subject = "🎉 Welcome to FeelLog!"
+    recipients = [to_email]
 
-Welcome to FeelLog – we're so glad you're here!
+    body = f"""
+    Hi there,<br><br>
+    Welcome to <strong>FeelLog</strong> – we're so glad you're here!<br><br>
+    FeelLog is your space to reflect, express, and grow emotionally.<br>
+    You're not alone on this journey—we're with you every step of the way.<br><br>
+    Log your feelings anytime, and let us help you find clarity and calm.<br><br>
+    With warmth,<br>
+    The FeelLog Team
+    """
 
-FeelLog is your space to reflect, express, and grow emotionally. 
-You're not alone on this journey—we're with you every step of the way.
+    html_body = f"""
+    <html>
+      <body style="font-family: Arial, sans-serif; background-color: #f8f9fa; padding: 20px;">
+        <div style="max-width: 600px; margin: auto; background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1);">
+          <h2 style="color: #2c3e50;">🎉 Welcome to FeelLog!</h2>
+          <p style="font-size: 16px;">Hi there,</p>
+          <p style="font-size: 16px;">
+            We're so happy you've joined <strong>FeelLog</strong> – your space for emotional clarity and self-reflection.
+          </p>
+          <p style="font-size: 16px;">
+            Start logging your thoughts and feelings whenever you need. It's private, supportive, and built just for you.
+          </p>
+          <p style="font-size: 16px;">
+            You're not alone – we're here with you, every step of the way.
+          </p>
+          <br>
+          <p style="font-size: 14px;">With warmth,</p>
+          <p style="font-size: 14px;"><strong>The FeelLog Team</strong></p>
+          <hr style="margin-top: 30px;">
+          <p style="font-size: 12px; color: #aaa;">Sent by FeelLog • Please do not reply to this email</p>
+        </div>
+      </body>
+    </html>
+    """
 
-Log your feelings anytime, and let us help you find clarity and calm.
-
-With warmth,  
-The FeelLog Team
-"""
+    message = MessageSchema(
+        subject=subject,
+        recipients=recipients,
+        body=html_body,
+        subtype=MessageType.html
     )
 
-    # HTML version
-    html_content = f"""
-        <html>
-          <body style="font-family: Arial, sans-serif; background-color: #f8f9fa; padding: 20px;">
-            <div style="max-width: 600px; margin: auto; background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1);">
-              <h2 style="color: #2c3e50;">🎉 Welcome to FeelLog!</h2>
-              <p style="font-size: 16px;">Hi there,</p>
-              <p style="font-size: 16px;">
-                We're so happy you've joined <strong>FeelLog</strong> – your space for emotional clarity and self-reflection.
-              </p>
-              <p style="font-size: 16px;">
-                Start logging your thoughts and feelings whenever you need. It's private, supportive, and built just for you.
-              </p>
-              <p style="font-size: 16px;">
-                You're not alone – we're here with you, every step of the way.
-              </p>
-              <br>
-              <p style="font-size: 14px;">With warmth,</p>
-              <p style="font-size: 14px;"><strong>The FeelLog Team</strong></p>
-              <hr style="margin-top: 30px;">
-              <p style="font-size: 12px; color: #aaa;">Sent by FeelLog • Please do not reply to this email</p>
-            </div>
-          </body>
-        </html>
-        """
+    fm = FastMail(conf)
+    await fm.send_message(message)
 
-    message.add_alternative(html_content, subtype="html")
+async def send_otp_email(to_email: EmailStr, otp: str):
+    subject = "🔐 Your OTP Code - Secure Verification"
+    recipients = [to_email]
 
-    await aiosmtplib.send(
-        message,
-        hostname="smtp.gmail.com",
-        port=PORT,
-        start_tls=True,
-        username=EMAIL,
-        password=APP_PASSWORD,
-    )
-
-async def send_otp_email(to_email: str, otp: str):
-    message = EmailMessage()
-    message["From"] = f"FeelLog {EMAIL}"
-    message["To"] = to_email
-    message["Subject"] = "🔐 Your OTP Code - Secure Verification"
-
-    # Plain text (fallback)
-    message.set_content(
-        f"Your OTP code is: {otp}\nThis code will expire in 15 minutes."
-    )
-
-    # HTML version
-    html_content = f"""
+    html_body = f"""
     <html>
       <body style="font-family: Arial, sans-serif; background-color: #f8f9fa; padding: 20px;">
         <div style="max-width: 600px; margin: auto; background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1);">
@@ -87,13 +81,13 @@ async def send_otp_email(to_email: str, otp: str):
       </body>
     </html>
     """
-    message.add_alternative(html_content, subtype="html")
 
-    await aiosmtplib.send(
-        message,
-        hostname="smtp.gmail.com",
-        port=PORT,
-        start_tls=True,
-        username=EMAIL,
-        password=APP_PASSWORD,
+    message = MessageSchema(
+        subject=subject,
+        recipients=recipients,
+        body=html_body,
+        subtype=MessageType.html
     )
+
+    fm = FastMail(conf)
+    await fm.send_message(message)
