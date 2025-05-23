@@ -16,5 +16,5 @@ alembic
 google-generativeai
 cryptography
 slowapi
-aiosmtplib
+fastapi_mail
 email-validator
