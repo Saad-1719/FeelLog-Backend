@@ -2,7 +2,7 @@ name: Keep Vercel FastAPI Warm
 
 on:
   schedule:
-    - cron: '*/10 * * * *'  # Every 5 minutes
+    - cron: '*/5 * * * *'  # Every 5 minutes
   workflow_dispatch:  # Allows manual runs from GitHub UI
 
 jobs:
