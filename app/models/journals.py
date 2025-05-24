@@ -43,6 +43,8 @@ class JournalUpdateRequest(BaseModel):
     journal_id: UUID
     title: str
     content: str
+    created_at: Optional[datetime] = Field(None, description="Journal creation date")
+
 
 
 class SentimentDataRequest(BaseModel):

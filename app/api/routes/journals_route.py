@@ -234,6 +234,7 @@ def update_journal(
         journal.content = encrypt_data(journal_content)
         journal.sentiment_label = label
         journal.sentiment_score = round(probability, 2)
+        journal.created_at=datetime.now()
 
         if label.lower() in ["negative", "neg"]:
             affirmations = generate_affirmations(journal_content)
