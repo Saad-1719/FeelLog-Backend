@@ -1,0 +1,15 @@
+name: Keep Vercel FastAPI Warm
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'  # Every 5 minutes
+  workflow_dispatch:  # Allows manual runs from GitHub UI
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Ping FastAPI /health
+        run: |
+          curl -s https://feel-log-backend.vercel.app/health || echo "Ping failed"

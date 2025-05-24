@@ -72,3 +72,9 @@ app.include_router(journals_route.router, prefix="/api")
 @limiter.limit("30/minute")
 def root(request: Request = None):
     return {"message": "Welcome to FeelLog Backend"}
+
+@app.get("/health")
+@limiter.exempt
+def health():
+    return {"status": "ok"}
+
