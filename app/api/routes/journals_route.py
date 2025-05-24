@@ -48,6 +48,7 @@ def add_journal(
     journal_title = journal_input.title
     journal_content = journal_input.content
     affirmations_json = None
+    journal_time=journal_input.created_at
 
     if not journal_content.strip():
         raise HTTPException(
@@ -78,7 +79,8 @@ def add_journal(
         user_id=user.id,
         sentiment_label=label,
         sentiment_score=round(probability, 2),
-        created_at=datetime.now(),
+        created_at=journal_time,
+
     )
 
     try:
@@ -114,6 +116,7 @@ def add_journal(
     return JournalReponse(
         title=journal_title,
         content=journal_content,
+        created_at=journal_time,
         affirmations=json.loads(affirmations_json) if affirmations_json else [],
     )
 
@@ -190,6 +193,7 @@ def update_journal(
     try:
         journal_title = request.title
         journal_content = request.content
+        journal_time=request.created_at
 
         if not journal_content.strip():
             raise HTTPException(
@@ -234,7 +238,7 @@ def update_journal(
         journal.content = encrypt_data(journal_content)
         journal.sentiment_label = label
         journal.sentiment_score = round(probability, 2)
-        journal.created_at=datetime.now()
+        journal.created_at=journal_time
 
         if label.lower() in ["negative", "neg"]:
             affirmations = generate_affirmations(journal_content)
@@ -279,6 +283,7 @@ def update_journal(
         return JournalReponse(
             title=journal_title,
             content=journal_content,
+            created_at=journal_time,
             affirmations=json.loads(affirmations_json) if affirmations_json else [],
         )
     except Exception as e:

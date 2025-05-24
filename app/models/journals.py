@@ -15,6 +15,8 @@ class JournalReponse(BaseModel):
     title: str
     content: str
     affirmations: Optional[Any] = None
+    created_at: Optional[datetime] = Field(None, description="Journal creation date")
+
 
 
 class AffirmationsRead(BaseModel):

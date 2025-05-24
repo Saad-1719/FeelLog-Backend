@@ -3,6 +3,7 @@ from sqlalchemy.orm import relationship
 from app.services.db import Base
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
+from sqlalchemy.sql import func
 
 
 class Journal(Base):
@@ -13,7 +14,7 @@ class Journal(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     sentiment_label = Column(String, nullable=False)
     sentiment_score = Column(Float, nullable=False)
-    created_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     user = relationship("User", back_populates="journals")
     affirmations = relationship(
         "Affirmation", back_populates="journal", cascade="all, delete-orphan"
