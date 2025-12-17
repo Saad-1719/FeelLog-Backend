@@ -13,7 +13,7 @@ pydantic[email]
 bcrypt==4.3.0
 pyjwt
 alembic
-google-generativeai
+google-genai
 cryptography
 slowapi
 fastapi_mail

@@ -1,10 +1,11 @@
 import json
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from app.core.config import GEMINI_API_KEY
 import re
 
-client = genai.configure(api_key=GEMINI_API_KEY)
-genai_model = genai.GenerativeModel("gemini-2.0-flash")
+client = genai.Client(api_key=GEMINI_API_KEY)
+# genai_model = genai.GenerativeModel("gemini-2.0-flash")
 
 
 def analyze_sentiments(content: str) -> dict:
@@ -35,9 +36,16 @@ def analyze_sentiments(content: str) -> dict:
                 "probability": XX.XX
                 }}"""
 
-    response = genai_model.generate_content(
-        contents=prompt_to_analyze_journal_sentiment
+    response = client.models.generate_content(
+        model='gemini-2.5-flash',
+        contents=prompt_to_analyze_journal_sentiment,
+        config=types.GenerateContentConfig(
+        temperature=0.7,
+        top_p=0.95,
+        top_k=10,
+    ),
     )
+    
     cleaned = re.sub(r"```json|```", "", response.text).strip()
     return json.loads(cleaned)
 
@@ -82,7 +90,13 @@ def generate_affirmations(content: str) -> dict:
                 ]
             }}
 """
-    response = genai_model.generate_content(contents=prompt)
-
+    response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents=prompt,
+    config=types.GenerateContentConfig(
+        temperature=0.7,
+        top_p=0.95,
+        top_k=10,
+    ))
     cleaned = re.sub(r"```json|```", "", response.text).strip()
     return json.loads(cleaned)
