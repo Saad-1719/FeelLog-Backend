@@ -1,5 +1,4 @@
 from http.client import HTTPException
-
 from fastapi import FastAPI,Request,HTTPException,Response
 from app.api.routes import auth_routes, journals_route
 from fastapi.middleware.cors import CORSMiddleware
@@ -33,6 +32,23 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="FeelLog", version="1.0.0", lifespan=lifespan)
 
+origins = [
+    "http://localhost:5173",
+    "https://www.feellog.site",
+"https://feel-log-backend.vercel.app",
+    "http://127.0.0.1:8000"
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE","OPTIONS"],
+    allow_headers=["X-Session-ID", "Content-Type", "Authorization"],
+    expose_headers=["*"],
+    max_age=3600,
+)
+
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
     response: Response = await call_next(request)
@@ -50,20 +66,6 @@ app.state.limiter = limiter #type: ignore
 app.add_exception_handler(RateLimitExceeded,_rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
-origins = [
-    "http://localhost:5173",
-    "https://www.feellog.site",
-"https://feel-log-backend.vercel.app",
-    "http://127.0.0.1:8000"
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
-    allow_headers=["X-Session-ID", "Content-Type", "Authorization"]
-)
 
 app.include_router(auth_routes.router, prefix="/api")
 app.include_router(journals_route.router, prefix="/api")
